@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LAN Chat</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section id="landing" class="panel landing">
+        <div class="landingCopy">
+          <p class="eyebrow">LAN ROOM</p>
+          <h1>Local files, quiet chat.</h1>
+          <p class="subtle">同一個局域網內，開房、審核、聊天、傳檔。所有內容留在 Host 這台機器。</p>
+        </div>
+        <div class="grid two">
+          <form id="createRoomForm" class="card">
+            <h2>成為 Host</h2>
+            <label>房間名稱 <input name="roomName" placeholder="Studio Room" /></label>
+            <label>你的名稱 <input name="hostName" placeholder="Host" /></label>
+            <button type="submit">建立 Room</button>
+          </form>
+          <form id="joinRoomForm" class="card mutedCard">
+            <h2>加入 Room</h2>
+            <label>Room Code <input name="roomCode" maxlength="6" placeholder="ABC123" required /></label>
+            <label>你的名稱 <input name="clientName" placeholder="Naya" required /></label>
+            <button type="submit">送出加入申請</button>
+          </form>
+        </div>
+      </section>
+
+      <section id="chat" class="panel chat hidden">
+        <aside class="sidebar">
+          <div>
+            <p class="eyebrow">ROOM</p>
+            <h2 id="roomTitle">Room</h2>
+            <div class="code" id="roomCode">------</div>
+          </div>
+          <div id="pendingBox" class="pending hidden">
+            <h3>待審核</h3>
+            <div id="pendingList"></div>
+          </div>
+          <div>
+            <h3>成員</h3>
+            <div id="memberList" class="members"></div>
+          </div>
+          <button id="leaveButton" class="ghost">回首頁</button>
+        </aside>
+
+        <section class="conversation">
+          <header class="topbar">
+            <div>
+              <strong id="statusText">連線中</strong>
+              <span id="roleText"></span>
+            </div>
+            <div class="topActions">
+              <button id="findButton" type="button" class="iconButton" aria-label="查找訊息">Find</button>
+              <button id="drawerButton" type="button" class="iconButton" aria-label="開啟檔案抽屜">Files</button>
+            </div>
+          </header>
+          <div id="messages" class="messages"></div>
+          <form id="messageForm" class="composer">
+            <div id="attachmentList" class="attachmentList hidden"></div>
+            <input id="messageInput" autocomplete="off" placeholder="輸入訊息或貼上連結" />
+            <label class="fileButton" aria-label="新增檔案">+<input id="fileInput" type="file" multiple hidden /></label>
+            <button id="sendButton" type="submit">送出</button>
+          </form>
+        </section>
+
+        <aside id="fileDrawer" class="fileDrawer" aria-label="檔案預覽抽屜">
+          <div class="drawerHeader">
+            <div>
+              <p class="eyebrow">FILES</p>
+              <h2>Room Vault</h2>
+            </div>
+            <button id="closeDrawerButton" type="button" class="ghost small">關閉</button>
+          </div>
+          <label class="drawerSearch">依名稱搜尋
+            <input id="fileSearchInput" type="search" placeholder="輸入檔名，例如 apk、summary、png" />
+          </label>
+          <div id="fileCategoryTabs" class="categoryTabs" role="tablist" aria-label="檔案分類"></div>
+          <div id="fileList" class="fileList"></div>
+        </aside>
+      </section>
+    </main>
+
+    <section id="searchModal" class="modal hidden" role="dialog" aria-modal="true" aria-label="查找訊息">
+      <div class="modalCard">
+        <div class="modalHeader">
+          <div>
+            <p class="eyebrow">FIND</p>
+            <h2>查找訊息與檔案</h2>
+          </div>
+          <button id="closeSearchButton" type="button" class="ghost small">關閉</button>
+        </div>
+        <input id="globalSearchInput" type="search" placeholder="模糊搜尋文字、檔名、作者" />
+        <div id="searchResults" class="searchResults"></div>
+      </div>
+    </section>
+
+    <div id="contextMenu" class="contextMenu hidden" role="menu">
+      <button type="button" data-menu-action="download">下載</button>
+      <button type="button" data-menu-action="delete" class="dangerText">刪除</button>
+    </div>
+    <div id="drawerBackdrop" class="drawerBackdrop hidden"></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
