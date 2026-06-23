@@ -3,3 +3,7 @@ data/
 .codegraph/
 .DS_Store
 *.log
+.env
+*.env
+*.local
+*.secret
