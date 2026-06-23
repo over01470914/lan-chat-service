@@ -23,7 +23,9 @@ Build a browser-based LAN chat service where one machine acts as the host and ot
 - AC-5: Given the server restarts, when the host/client reopens a room, then retained messages and file links are still available.
 - AC-6: Given multiple rooms exist, when users join different rooms, then messages/files do not cross room boundaries.
 - AC-7: Given a Linux machine has no browser UI, when it runs the CLI host/join/send/approve commands, then it can create or participate in a room and receive room/client tokens.
-- AC-8: Given a browser has hosted or joined rooms before, when it opens the landing page, then recent rooms are available for quick re-entry.
+- AC-8: Given a browser has hosted or joined rooms before, when it opens the landing page, then recent rooms are available for quick re-entry. Pending rooms must re-enter as pending instead of showing a missing-room error.
+- AC-9: Given a client is pending or rejected, when they enter chat, then the composer and upload controls are disabled with a conspicuous chat-section notice.
+- AC-10: Given the Host creates or manages a room, when they enable Auto approve in Web or CLI, then pending clients are approved and new clients can join without manual approval; non-host clients cannot toggle it.
 
 ## Non-goals
 - End-to-end encryption.

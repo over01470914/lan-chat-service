@@ -77,6 +77,7 @@ function publicRoom(room) {
   return {
     code: room.code,
     name: room.name,
+    autoApprove: Boolean(room.autoApprove),
     createdAt: room.createdAt,
     pending: room.pending.map((id) => db.clients[id]).filter(Boolean),
     approved: room.approved.map((id) => db.clients[id]).filter(Boolean),
@@ -88,6 +89,7 @@ function ensureRoomLists(room) {
   room.pending ||= [];
   room.approved ||= [];
   room.rejected ||= [];
+  if (typeof room.autoApprove !== 'boolean') room.autoApprove = false;
 }
 
 function requireRoom(code) {
@@ -99,6 +101,14 @@ function requireRoom(code) {
   }
   ensureRoomLists(room);
   return room;
+}
+
+function requireHost(room, hostId) {
+  if (hostId !== room.hostId) {
+    const error = new Error('Only host can update room settings');
+    error.statusCode = 403;
+    throw error;
+  }
 }
 
 function requireApproved(room, clientId) {
@@ -222,6 +232,7 @@ app.post('/api/rooms', async (request) => {
   }
   const name = String(request.body?.name || 'LAN Room').slice(0, 80);
   const hostName = String(request.body?.hostName || 'Host').slice(0, 40);
+  const autoApprove = request.body?.autoApprove === true;
   const hostId = randomUUID();
   const code = roomCode();
   db.clients[hostId] = { id: hostId, name: hostName, role: 'host', createdAt: new Date().toISOString() };
@@ -229,6 +240,7 @@ app.post('/api/rooms', async (request) => {
     code,
     name,
     hostId,
+    autoApprove,
     createdAt: new Date().toISOString(),
     pending: [],
     approved: [hostId],
@@ -251,21 +263,48 @@ app.post('/api/rooms/:code/join', async (request) => {
   if (existingClientId && db.clients[existingClientId] && room.approved.includes(existingClientId)) {
     return { status: 'approved', clientId: existingClientId, room: publicRoom(room) };
   }
+  if (existingClientId && db.clients[existingClientId] && room.pending.includes(existingClientId)) {
+    if (room.autoApprove) {
+      room.pending = room.pending.filter((id) => id !== existingClientId);
+      if (!room.approved.includes(existingClientId)) room.approved.push(existingClientId);
+      await saveDb();
+      const publicState = publicRoom(room);
+      broadcast(room.code, { type: 'room-updated', room: publicState });
+      return { status: 'approved', clientId: existingClientId, room: publicState };
+    }
+    return { status: 'pending', clientId: existingClientId, room: publicRoom(room) };
+  }
   const clientId = randomUUID();
   db.clients[clientId] = { id: clientId, name, role: 'client', createdAt: new Date().toISOString() };
-  room.pending.push(clientId);
+  const status = room.autoApprove ? 'approved' : 'pending';
+  if (room.autoApprove) room.approved.push(clientId);
+  else room.pending.push(clientId);
   await saveDb();
-  broadcast(room.code, { type: 'pending-updated', room: publicRoom(room) });
-  return { status: 'pending', clientId, room: publicRoom(room) };
+  broadcast(room.code, { type: room.autoApprove ? 'room-updated' : 'pending-updated', room: publicRoom(room) });
+  return { status, clientId, room: publicRoom(room) };
+});
+
+app.post('/api/rooms/:code/settings', async (request) => {
+  const room = requireRoom(request.params.code);
+  requireHost(room, request.body?.hostId);
+  if (typeof request.body?.autoApprove === 'boolean') {
+    room.autoApprove = request.body.autoApprove;
+    if (room.autoApprove && room.pending.length) {
+      for (const clientId of room.pending) {
+        if (!room.approved.includes(clientId)) room.approved.push(clientId);
+      }
+      room.pending = [];
+    }
+  }
+  await saveDb();
+  const publicState = publicRoom(room);
+  broadcast(room.code, { type: 'room-updated', room: publicState });
+  return { room: publicState };
 });
 
 app.post('/api/rooms/:code/approve', async (request) => {
   const room = requireRoom(request.params.code);
-  if (request.body?.hostId !== room.hostId) {
-    const error = new Error('Only host can approve clients');
-    error.statusCode = 403;
-    throw error;
-  }
+  requireHost(room, request.body?.hostId);
   const clientId = request.body?.clientId;
   room.pending = room.pending.filter((id) => id !== clientId);
   room.rejected = room.rejected.filter((id) => id !== clientId);
@@ -277,11 +316,7 @@ app.post('/api/rooms/:code/approve', async (request) => {
 
 app.post('/api/rooms/:code/reject', async (request) => {
   const room = requireRoom(request.params.code);
-  if (request.body?.hostId !== room.hostId) {
-    const error = new Error('Only host can reject clients');
-    error.statusCode = 403;
-    throw error;
-  }
+  requireHost(room, request.body?.hostId);
   const clientId = request.body?.clientId;
   room.pending = room.pending.filter((id) => id !== clientId);
   room.approved = room.approved.filter((id) => id !== clientId);

@@ -17,6 +17,7 @@ try {
   else if (command === 'room') await showRoom();
   else if (command === 'approve') await approveClient();
   else if (command === 'reject') await rejectClient();
+  else if (command === 'settings') await updateSettings();
   else if (command === 'send') await sendMessage();
   else throw new Error(`Unknown command: ${command}`);
 } catch (error) {
@@ -45,10 +46,10 @@ function normalizeServer(value) {
 }
 
 async function hostRoom() {
-  const created = await post('/api/rooms', { name: flags.room || 'LAN Room', hostName: flags.name || 'Host CLI' });
+  const created = await post('/api/rooms', { name: flags.room || 'LAN Room', hostName: flags.name || 'Host CLI', autoApprove: Boolean(flags['auto-approve']) });
   rememberSession({ server, roomCode: created.room.code, roomName: created.room.name, clientId: created.clientId, role: 'host' });
-  const payload = { server, roomCode: created.room.code, roomToken: created.room.code, hostId: created.clientId, hostToken: created.clientId, room: created.room };
-  print(payload, [`Room ${created.room.code} created`, `server=${server}`, `roomToken=${created.room.code}`, `hostToken=${created.clientId}`]);
+  const payload = { server, roomCode: created.room.code, roomToken: created.room.code, hostId: created.clientId, hostToken: created.clientId, autoApprove: created.room.autoApprove, room: created.room };
+  print(payload, [`Room ${created.room.code} created`, `server=${server}`, `roomToken=${created.room.code}`, `hostToken=${created.clientId}`, `autoApprove=${created.room.autoApprove ? 'on' : 'off'}`]);
   if (flags.interactive) await interactive(created.room.code, created.clientId, 'host');
 }
 
@@ -77,6 +78,13 @@ async function rejectClient() {
   const roomCode = requireFlag('room').toUpperCase();
   const rejected = await post(`/api/rooms/${roomCode}/reject`, { hostId: requireFlag('host-id'), clientId: requireFlag('client-id') });
   print(rejected, [`Rejected ${flags['client-id']} in ${roomCode}`]);
+}
+
+async function updateSettings() {
+  const roomCode = requireFlag('room').toUpperCase();
+  if (!flags['auto-approve'] && !flags['manual-approve']) throw new Error('--auto-approve or --manual-approve is required');
+  const updated = await post(`/api/rooms/${roomCode}/settings`, { hostId: requireFlag('host-id'), autoApprove: Boolean(flags['auto-approve']) });
+  print(updated, [`Room ${roomCode} autoApprove=${updated.room.autoApprove ? 'on' : 'off'}`, `pending=${updated.room.pending.length}`, `approved=${updated.room.approved.length}`]);
 }
 
 async function sendMessage() {
@@ -166,16 +174,19 @@ function showHelp() {
   console.log(`LAN Chat CLI
 
 Usage:
-  lan-chat host --server http://host:4301 --room "Ops Room" --name Host [--json] [--interactive]
+  lan-chat host --server http://host:4301 --room "Ops Room" --name Host [--auto-approve] [--json] [--interactive]
   lan-chat join --server http://host:4301 --room ABC123 --name Worker [--json] [--interactive]
   lan-chat room --server http://host:4301 --room ABC123 [--json]
   lan-chat approve --room ABC123 --host-id <hostToken> --client-id <clientId>
   lan-chat reject --room ABC123 --host-id <hostToken> --client-id <clientId>
+  lan-chat settings --room ABC123 --host-id <hostToken> --auto-approve
+  lan-chat settings --room ABC123 --host-id <hostToken> --manual-approve
   lan-chat send --room ABC123 --client-id <clientId> --text "hello"
 
 Notes:
   roomToken is the six-character room code.
   hostToken is the host client id; keep it private because it can approve/reject clients.
+  --auto-approve lets CLI/Linux clients join and send without a browser approval step.
   LAN_CHAT_SERVER can provide a default server URL.
 `);
 }

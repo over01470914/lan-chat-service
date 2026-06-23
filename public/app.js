@@ -44,7 +44,7 @@ $('#createRoomForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.currentTarget);
   const result = await api('/api/rooms', {
     method: 'POST',
-    body: { name: form.get('roomName'), hostName: form.get('hostName') },
+    body: { name: form.get('roomName'), hostName: form.get('hostName'), autoApprove: form.get('autoApprove') === 'on' },
   });
   state.clientId = result.clientId;
   state.role = 'host';
@@ -137,6 +137,20 @@ $('#fileSearchInput').addEventListener('input', (event) => {
 $('#findButton').addEventListener('click', openSearch);
 $('#closeSearchButton').addEventListener('click', closeSearch);
 $('#globalSearchInput').addEventListener('input', renderSearchResults);
+$('#autoApproveToggle').addEventListener('change', async (event) => {
+  if (!state.room || state.role !== 'host') return;
+  event.currentTarget.disabled = true;
+  try {
+    const result = await api(`/api/rooms/${state.room.code}/settings`, {
+      method: 'POST',
+      body: { hostId: state.clientId, autoApprove: event.currentTarget.checked },
+    });
+    state.room = result.room;
+    renderRoom(state.room);
+  } finally {
+    event.currentTarget.disabled = false;
+  }
+});
 contextMenu.addEventListener('click', async (event) => {
   const button = event.target.closest('[data-menu-action]');
   if (!button || !state.activeFile) return;
@@ -185,19 +199,23 @@ function closeSearch() {
 }
 
 async function api(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: options.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' },
-    body: options.body instanceof FormData ? options.body : JSON.stringify(options.body || {}),
-  });
+  const hasBody = Object.prototype.hasOwnProperty.call(options, 'body');
+  const init = { ...options };
+  if (hasBody) {
+    init.headers = options.body instanceof FormData ? undefined : { 'Content-Type': 'application/json' };
+    init.body = options.body instanceof FormData ? options.body : JSON.stringify(options.body || {});
+  } else {
+    delete init.body;
+  }
+  const response = await fetch(url, init);
   if (!response.ok) throw new Error(await response.text());
   return response.json();
 }
 
 function enterRoom(room, status = 'approved') {
   state.room = room;
-  state.accessStatus = status;
-  rememberRoom(room, status);
+  state.accessStatus = deriveAccessStatus(room, status);
+  rememberRoom(room, state.accessStatus);
   landing.classList.add('hidden');
   chat.classList.remove('hidden');
   $('#roomTitle').textContent = room.name;
@@ -268,16 +286,28 @@ function renderRecentRooms() {
         state.role = item.role;
         localStorage.setItem('lan-chat-client-id', state.clientId);
         localStorage.setItem('lan-chat-role', state.role);
-        const result = await api(`/api/rooms/${item.code}`);
-        enterRoom(result.room, item.status || 'approved');
-      } catch {
-        alert('這個 Room 已不存在或目前無法連線。');
+        const result = item.role === 'host'
+          ? await api(`/api/rooms/${item.code}`)
+          : await api(`/api/rooms/${item.code}/join`, { method: 'POST', body: { name: item.name || 'Client', clientId: item.clientId } });
+        enterRoom(result.room, result.status || item.status || 'approved');
+      } catch (error) {
+        console.warn('recent room reopen failed', error);
+        alert('這個 Room 已不存在、目前無法連線，或你的舊身份已失效。');
       }
     });
   });
   list.querySelectorAll('[data-forget-recent]').forEach((button) => {
     button.addEventListener('click', () => forgetRecentRoom(Number(button.dataset.forgetRecent)));
   });
+}
+
+function deriveAccessStatus(room, statusHint) {
+  const approved = room.approved.some((member) => member.id === state.clientId);
+  const isHost = room.approved.some((member) => member.id === state.clientId && member.role === 'host');
+  const pending = room.pending.some((member) => member.id === state.clientId);
+  if (isHost || approved) return 'approved';
+  if (statusHint === 'rejected' || (!pending && statusHint !== 'pending')) return 'rejected';
+  return 'pending';
 }
 
 function connectSocket() {
@@ -295,6 +325,7 @@ function connectSocket() {
     if (payload.type === 'room-updated' || payload.type === 'pending-updated') {
       state.room = payload.room;
       updateAccess(state.room);
+      rememberRoom(state.room, state.accessStatus);
       renderRoom(state.room);
     }
     if (payload.type === 'rejected') {
@@ -308,18 +339,38 @@ function connectSocket() {
 }
 
 function updateAccess(room, statusHint) {
-  const approved = room.approved.some((member) => member.id === state.clientId);
-  const pending = room.pending.some((member) => member.id === state.clientId);
-  const rejected = statusHint === 'rejected' || (state.role === 'client' && !approved && !pending);
-  state.accessStatus = state.role === 'host' || approved ? 'approved' : rejected ? 'rejected' : 'pending';
+  state.accessStatus = deriveAccessStatus(room, statusHint);
 
   const disabled = state.accessStatus !== 'approved';
   messageInput.disabled = disabled;
   fileInput.disabled = disabled;
   sendButton.disabled = disabled;
+  messageInput.placeholder = disabled ? '等待 Host 審核後才能輸入訊息' : '輸入訊息或貼上連結';
   $('.fileButton').classList.toggle('disabled', disabled);
-  $('#roleText').textContent = state.role === 'host' ? 'Host mode' : state.accessStatus === 'approved' ? 'Client mode' : state.accessStatus === 'rejected' ? '已被 Host 拒絕' : '等待 Host 審核';
-  $('#statusText').textContent = state.accessStatus === 'rejected' ? '已拒絕' : state.accessStatus === 'pending' ? '待審核' : '已連線';
+  chat.classList.toggle('access-pending', state.accessStatus === 'pending');
+  chat.classList.toggle('access-rejected', state.accessStatus === 'rejected');
+
+  const autoApproveControl = $('#autoApproveControl');
+  const autoApproveToggle = $('#autoApproveToggle');
+  const isHost = room.approved.some((member) => member.id === state.clientId && member.role === 'host');
+  autoApproveControl.classList.toggle('hidden', !isHost);
+  autoApproveToggle.checked = Boolean(room.autoApprove);
+  autoApproveToggle.disabled = !isHost;
+
+  const notice = $('#accessNotice');
+  const noticeTitle = $('#accessNoticeTitle');
+  const noticeText = $('#accessNoticeText');
+  notice.classList.toggle('hidden', state.accessStatus === 'approved');
+  if (state.accessStatus === 'pending') {
+    noticeTitle.textContent = '等待 Host 審核中';
+    noticeText.textContent = '你目前還不能打字或上傳檔案。請等 Host 批准，或請 Host 開啟 Auto approve。';
+  } else if (state.accessStatus === 'rejected') {
+    noticeTitle.textContent = 'Host 已拒絕此身份';
+    noticeText.textContent = '這個 clientId 不能在此 Room 發訊息或上傳檔案，請回首頁重新申請或聯絡 Host。';
+  }
+
+  $('#roleText').textContent = isHost ? `Host mode / Auto approve ${room.autoApprove ? 'ON' : 'OFF'}` : state.accessStatus === 'approved' ? 'Client mode' : state.accessStatus === 'rejected' ? '已被 Host 拒絕' : '等待 Host 審核';
+  $('#statusText').textContent = state.accessStatus === 'rejected' ? '已拒絕' : state.accessStatus === 'pending' ? '待審核中，暫不可發言' : '已連線';
 }
 
 function addAttachments(fileList) {

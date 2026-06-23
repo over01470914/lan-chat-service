@@ -41,11 +41,18 @@ The CLI works without a browser window and is intended for headless Linux hosts 
 # Create a room and print the room token + host token
 node bin/lan-chat.js host --server http://127.0.0.1:4301 --room "Ops Room" --name "Tencent Host" --json
 
+# Headless/Linux friendly mode: clients are approved as soon as they join
+node bin/lan-chat.js host --server http://127.0.0.1:4301 --room "Ops Room" --name "Tencent Host" --auto-approve --json
+
 # Join from another terminal/machine; host must approve the returned clientId
 node bin/lan-chat.js join --server http://SERVER_IP:4301 --room ABC123 --name "Linux Worker" --json
 
 # Host approves a pending client
 node bin/lan-chat.js approve --server http://SERVER_IP:4301 --room ABC123 --host-id <hostToken> --client-id <clientId>
+
+# Host toggles room auto-approval from CLI
+node bin/lan-chat.js settings --server http://SERVER_IP:4301 --room ABC123 --host-id <hostToken> --auto-approve
+node bin/lan-chat.js settings --server http://SERVER_IP:4301 --room ABC123 --host-id <hostToken> --manual-approve
 
 # Send a message without opening the Web UI
 node bin/lan-chat.js send --server http://SERVER_IP:4301 --room ABC123 --client-id <clientId> --text "hello"
@@ -59,10 +66,11 @@ Terminology:
 - `roomToken` = six-character room code that other devices use to join.
 - `hostToken` = host client id; keep it private because it can approve/reject clients.
 - CLI sessions are cached under `~/.lan-chat-service/sessions.json` for convenience.
+- `--auto-approve` is also available as a Host-only toggle in the Web room header. It approves existing pending clients when enabled and lets new clients enter directly.
 
 ## Web recent rooms
 
-The browser home page now stores recently hosted/joined rooms in `localStorage` and shows a quick-access section. Each entry stores room code, room name, role, client id, origin, and last opened time; it does not store server secrets.
+The browser home page now stores recently hosted/joined rooms in `localStorage` and shows a quick-access section. Re-opening a client room goes through `/join` again so a pending client remains pending instead of being mistaken for a missing room. Each entry stores room code, room name, role, client id, origin, and last opened time; it does not store server secrets.
 
 ## PetLink Jenkins artifact mirror
 

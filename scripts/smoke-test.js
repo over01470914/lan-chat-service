@@ -21,6 +21,7 @@ try {
   const create = await post('/api/rooms', { name: 'Smoke Room', hostName: 'Boss Host' });
   assert(create.room.code, 'room code exists');
   assert(create.clientId, 'host client id exists');
+  assert(create.room.autoApprove === false, 'manual approval is default');
 
   const rejectedJoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Client Reject' });
   assert(rejectedJoin.status === 'pending', 'rejected client starts pending');
@@ -38,12 +39,29 @@ try {
   const join = await post(`/api/rooms/${create.room.code}/join`, { name: 'Client A' });
   assert(join.status === 'pending', 'client starts pending');
   assert(join.room.pending.length === 1, 'pending client visible');
+  const pendingRejoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Client A', clientId: join.clientId });
+  assert(pendingRejoin.status === 'pending', 'recent-room rejoin keeps pending clients pending');
+  assert(pendingRejoin.room.pending.filter((client) => client.id === join.clientId).length === 1, 'pending rejoin does not duplicate client');
 
   const approved = await post(`/api/rooms/${create.room.code}/approve`, { hostId: create.clientId, clientId: join.clientId });
   assert(approved.room.approved.some((client) => client.id === join.clientId), 'client approved');
 
   const text = await post(`/api/rooms/${create.room.code}/messages`, { clientId: join.clientId, text: 'hello from smoke' });
   assert(text.message.text === 'hello from smoke', 'text message sent');
+
+  const autoRoom = await post('/api/rooms', { name: 'Auto Room', hostName: 'Auto Host', autoApprove: true });
+  assert(autoRoom.room.autoApprove === true, 'auto approve can be enabled at creation');
+  const autoJoin = await post(`/api/rooms/${autoRoom.room.code}/join`, { name: 'Auto Client' });
+  assert(autoJoin.status === 'approved', 'auto approve client starts approved');
+  assert(autoJoin.room.approved.some((client) => client.id === autoJoin.clientId), 'auto approved client is in approved list');
+  const manualRoom = await post('/api/rooms', { name: 'Manual Toggle Room', hostName: 'Toggle Host' });
+  const pendingToggleJoin = await post(`/api/rooms/${manualRoom.room.code}/join`, { name: 'Toggle Client' });
+  assert(pendingToggleJoin.status === 'pending', 'client is pending before settings toggle');
+  await expectPostStatus(`/api/rooms/${manualRoom.room.code}/settings`, { hostId: pendingToggleJoin.clientId, autoApprove: true }, 403, 'non-host cannot toggle auto approve');
+  const toggled = await post(`/api/rooms/${manualRoom.room.code}/settings`, { hostId: manualRoom.clientId, autoApprove: true });
+  assert(toggled.room.autoApprove === true, 'host can enable auto approve in room');
+  assert(toggled.room.pending.length === 0, 'enabling auto approve clears pending clients');
+  assert(toggled.room.approved.some((client) => client.id === pendingToggleJoin.clientId), 'enabling auto approve approves pending clients');
 
   const appJs = await readFile('public/app.js', 'utf8');
   const indexHtml = await readFile('public/index.html', 'utf8');
@@ -52,7 +70,12 @@ try {
   assert(appJs.includes('event.dataTransfer.files'), 'drop attaches files before send');
   assert(appJs.includes('renderFilePreview'), 'file drawer renders previews');
   assert(appJs.includes('touchstart'), 'mobile long press menu is wired');
+  assert(appJs.includes('/settings'), 'room settings toggle is wired');
+  assert(appJs.includes('deriveAccessStatus'), 'pending/rejected status derives from room state');
+  assert(appJs.includes('Object.prototype.hasOwnProperty.call(options, \'body\')'), 'GET requests do not send JSON bodies');
   assert(indexHtml.includes('type="module"'), 'browser loads module utilities');
+  assert(indexHtml.includes('accessNotice'), 'pending access notice is rendered');
+  assert(indexHtml.includes('autoApproveToggle'), 'host auto approve toggle is rendered');
 
   const tempDir = await mkdtemp(joinPath(tmpdir(), 'lan-chat-smoke-'));
   const uploadPath = joinPath(tempDir, 'hello.txt');

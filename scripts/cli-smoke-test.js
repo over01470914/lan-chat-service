@@ -41,11 +41,20 @@ try {
   assert(retained.room.messages.length === 3, 'MAX_ROOM_MESSAGES retention trims old messages');
   assert(!retained.room.messages.some((message) => message.text === 'hello from cli'), 'oldest message was pruned');
 
+  const autoHosted = runCli(['host', '--server', baseUrl, '--room', 'CLI Auto Room', '--name', 'CLI Auto Host', '--auto-approve', '--json']);
+  assert(autoHosted.autoApprove === true, 'cli host --auto-approve creates auto approve room');
+  const autoJoined = runCli(['join', '--server', baseUrl, '--room', autoHosted.roomCode, '--name', 'CLI Auto Client', '--json']);
+  assert(autoJoined.status === 'approved', 'cli join is auto approved when room allows it');
+  const settingsOff = runCli(['settings', '--server', baseUrl, '--room', autoHosted.roomCode, '--host-id', autoHosted.hostId, '--manual-approve', '--json']);
+  assert(settingsOff.room.autoApprove === false, 'cli settings can disable auto approve');
+  const settingsOn = runCli(['settings', '--server', baseUrl, '--room', hosted.roomCode, '--host-id', hosted.hostId, '--auto-approve', '--json']);
+  assert(settingsOn.room.autoApprove === true, 'cli settings can enable auto approve');
+
   const health = await get('/api/health');
   assert(health.config.maxRoomMessages === 3, 'health exposes max room messages config');
   assert(health.config.maxTotalUploadBytes === 2 * 1024 * 1024, 'health exposes upload quota config');
 
-  console.log(JSON.stringify({ ok: true, roomCode: hosted.roomCode, checks: ['cli host', 'cli join', 'cli approve', 'cli send', 'cli room', 'retention config'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, roomCode: hosted.roomCode, checks: ['cli host', 'cli join', 'cli approve', 'cli send', 'cli room', 'retention config', 'cli auto approve', 'cli settings'] }, null, 2));
 } finally {
   server.kill('SIGTERM');
   await new Promise((resolve) => server.once('exit', resolve));

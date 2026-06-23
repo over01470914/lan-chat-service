@@ -19,6 +19,10 @@
             <h2>成為 Host</h2>
             <label>房間名稱 <input name="roomName" placeholder="Studio Room" /></label>
             <label>你的名稱 <input name="hostName" placeholder="Host" /></label>
+            <label class="toggleRow">
+              <input name="autoApprove" type="checkbox" />
+              <span><strong>自動批准加入</strong><small>適合 Linux CLI / 無畫面節點；知道 Room Code 即可直接進房。</small></span>
+            </label>
             <button type="submit">建立 Room</button>
           </form>
           <form id="joinRoomForm" class="card mutedCard">
@@ -65,10 +69,21 @@
               <span id="roleText"></span>
             </div>
             <div class="topActions">
+              <label id="autoApproveControl" class="togglePill hidden" title="只有 Host 可以修改">
+                <input id="autoApproveToggle" type="checkbox" />
+                <span>Auto approve</span>
+              </label>
               <button id="findButton" type="button" class="iconButton" aria-label="查找訊息">Find</button>
               <button id="drawerButton" type="button" class="iconButton" aria-label="開啟檔案抽屜">Files</button>
             </div>
           </header>
+          <div id="accessNotice" class="accessNotice hidden" role="status" aria-live="polite">
+            <div class="noticeIcon">⌛</div>
+            <div>
+              <strong id="accessNoticeTitle">等待 Host 審核</strong>
+              <p id="accessNoticeText">目前不能打字或上傳檔案。請等 Host 批准，或請 Host 開啟 Auto approve。</p>
+            </div>
+          </div>
           <div id="messages" class="messages"></div>
           <form id="messageForm" class="composer">
             <div id="attachmentList" class="attachmentList hidden"></div>

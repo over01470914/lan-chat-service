@@ -98,6 +98,18 @@ h2, h3 { margin: 0 0 1rem; letter-spacing: -0.03em; }
 .recentRoomOpen small { display: block; color: var(--muted); margin-top: 0.18rem; font-size: 0.78rem; }
 .recentRoomCode { display: inline-flex; padding: 0.45rem 0.58rem; border-radius: 12px; color: #bcf7df; background: rgba(101, 214, 173, 0.13); font-weight: 900; letter-spacing: 0.12em; }
 
+.toggleRow, .togglePill { display: flex; align-items: center; gap: 0.75rem; color: var(--text); }
+.toggleRow { padding: 0.75rem; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(101, 214, 173, 0.07); cursor: pointer; }
+.toggleRow input, .togglePill input { width: 1.1rem; min-width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }
+.toggleRow small { display: block; color: var(--muted); margin-top: 0.2rem; line-height: 1.35; }
+.togglePill { min-height: 42px; padding: 0.55rem 0.75rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255, 255, 255, 0.075); font-size: 0.82rem; font-weight: 850; white-space: nowrap; }
+.accessNotice { margin: 1rem 1rem 0; display: grid; grid-template-columns: 52px 1fr; gap: 0.85rem; align-items: center; padding: 1rem; border: 1px solid rgba(255, 188, 86, 0.42); border-radius: var(--radius); background: linear-gradient(135deg, rgba(255, 188, 86, 0.18), rgba(255, 255, 255, 0.055)); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22); }
+.accessNotice strong { display: block; color: #ffd89a; font-size: 1.05rem; }
+.accessNotice p { margin: 0.25rem 0 0; color: var(--muted); line-height: 1.45; }
+.noticeIcon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: rgba(255, 188, 86, 0.18); font-size: 1.65rem; }
+.chat.access-pending .composer, .chat.access-rejected .composer { opacity: 0.55; }
+.chat.access-pending .messages::before, .chat.access-rejected .messages::before { content: "審核未通過前，訊息與檔案上傳已停用"; display: grid; place-items: center; min-height: 96px; border: 1px dashed rgba(255, 188, 86, 0.38); border-radius: var(--radius); color: #ffd89a; background: rgba(255, 188, 86, 0.075); font-weight: 900; letter-spacing: 0.02em; }
+
 .chat { display: grid; grid-template-columns: 282px minmax(0, 1fr); position: relative; }
 .sidebar { padding: 1.1rem; display: grid; align-content: start; gap: 1.15rem; border-right: 1px solid var(--line); background: rgba(255, 255, 255, 0.045); }
 .code { display: inline-flex; margin-top: 0.4rem; padding: 0.65rem 0.9rem; border-radius: 14px; background: rgba(101, 214, 173, 0.13); color: #bcf7df; font-weight: 900; letter-spacing: 0.18em; }
@@ -184,7 +196,9 @@ h2, h3 { margin: 0 0 1rem; letter-spacing: -0.03em; }
   .grid.two, .chat { grid-template-columns: 1fr; }
   .sidebar { display: none; }
   .conversation { min-height: 100dvh; }
-  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(16, 21, 29, 0.94); backdrop-filter: blur(18px); }
+  .topbar { position: sticky; top: 0; z-index: 10; background: rgba(16, 21, 29, 0.94); backdrop-filter: blur(18px); align-items: flex-start; }
+  .topActions { flex-wrap: wrap; justify-content: flex-end; }
+  .togglePill { order: -1; }
   .messages { padding: 0.85rem; }
   .composer { grid-template-columns: 1fr auto; padding: 0.75rem; }
   #sendButton { grid-column: 1 / -1; }
