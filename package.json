@@ -11,7 +11,9 @@
     "smoke": "node scripts/smoke-test.js",
     "verify:lan": "node scripts/verify-lan.js",
     "bootstrap:artifacts": "node scripts/bootstrap-artifact-room.js",
-    "cli:smoke": "node scripts/cli-smoke-test.js"
+    "cli:smoke": "node scripts/cli-smoke-test.js",
+    "rooms:prune": "node scripts/prune-rooms.js",
+    "rooms:prune:test": "node scripts/prune-rooms-test.js"
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",

@@ -72,6 +72,32 @@ Terminology:
 
 The browser home page now stores recently hosted/joined rooms in `localStorage` and shows a quick-access section. Re-opening a client room goes through `/join` again so a pending client remains pending instead of being mistaken for a missing room. Each entry stores room code, room name, role, client id, origin, and last opened time; it does not store server secrets.
 
+## Test room / old room cleanup
+
+Use the prune script for QA/test-room cleanup. It is safe by default: without `--apply`, it only prints the deletion plan and does not mutate `db.json` or uploaded files.
+
+```bash
+# Preview old test/QA rooms only
+npm run rooms:prune -- --name-regex 'test|qa' --older-than 7d
+
+# Preview empty rooms older than one day
+npm run rooms:prune -- --empty --older-than 24h
+
+# Keep newest 50 rooms and preview the older overflow rooms
+npm run rooms:prune -- --max-rooms 50
+
+# Delete after reviewing the dry-run output
+npm run rooms:prune -- --name-regex 'test|qa' --older-than 7d --apply
+```
+
+Safety rules:
+
+- Multiple selectors are ANDed by default; use `--match-any` only when you really want OR semantics.
+- `PetLink Delivery Artifacts` is protected by default so artifact-room cleanup is not accidentally mixed with QA cleanup.
+- `--apply` writes a timestamped `db.json.bak-*` backup before mutation.
+- Referenced uploaded files for deleted rooms are removed; clients no longer referenced by retained rooms are also removed.
+- For Tencent/Baota deployment, pass `--data-dir /var/lib/lan-chat-service` or set `DATA_DIR` before running.
+
 ## PetLink Jenkins artifact mirror
 
 This service is now a delivery artifact mirror for Jenkins `petlink-delivery`.
@@ -134,6 +160,7 @@ Run the stronger LAN service verification:
 ```bash
 npm run verify:lan
 npm run cli:smoke
+npm run rooms:prune:test
 ```
 
 `verify:lan` starts the server on a temporary local port with an isolated `DATA_DIR`, then checks:
