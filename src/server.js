@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream, existsSync, mkdirSync } from 'node:fs';
-import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import { readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { join, resolve, sep } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -14,7 +14,13 @@ const ROOT_DIR = resolve(process.cwd());
 const DATA_DIR = process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : join(ROOT_DIR, 'data');
 const UPLOAD_DIR = join(DATA_DIR, 'uploads');
 const DB_PATH = join(DATA_DIR, 'db.json');
-const MAX_FILE_SIZE = 500 * 1024 * 1024;
+const DEFAULT_MAX_FILE_SIZE = 200 * 1024 * 1024;
+const DEFAULT_TOTAL_UPLOAD_BYTES = 20 * 1024 * 1024 * 1024;
+const MAX_FILE_SIZE = parseBytes(process.env.MAX_FILE_SIZE || process.env.MAX_UPLOAD_BYTES, DEFAULT_MAX_FILE_SIZE);
+const MAX_TOTAL_UPLOAD_BYTES = parseBytes(process.env.MAX_TOTAL_UPLOAD_BYTES || process.env.UPLOAD_QUOTA_BYTES, DEFAULT_TOTAL_UPLOAD_BYTES);
+const MAX_ROOM_MESSAGES = parsePositiveInt(process.env.MAX_ROOM_MESSAGES, 1000);
+const MAX_ROOMS = parsePositiveInt(process.env.MAX_ROOMS, 200);
+const MAX_TEXT_LENGTH = parsePositiveInt(process.env.MAX_TEXT_LENGTH, 4000);
 const UPLOAD_ROOT = resolve(UPLOAD_DIR);
 
 mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -24,6 +30,22 @@ await app.register(fastifyMultipart, { limits: { fileSize: MAX_FILE_SIZE } });
 
 let db = await loadDb();
 const sockets = new Map();
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(String(value || ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parseBytes(value, fallback) {
+  if (!value) return fallback;
+  const text = String(value).trim().toLowerCase();
+  const match = text.match(/^(\d+(?:\.\d+)?)(b|kb|mb|gb)?$/);
+  if (!match) return fallback;
+  const amount = Number(match[1]);
+  const unit = match[2] || 'b';
+  const multiplier = unit === 'gb' ? 1024 ** 3 : unit === 'mb' ? 1024 ** 2 : unit === 'kb' ? 1024 : 1;
+  return Math.floor(amount * multiplier);
+}
 
 function createEmptyDb() {
   return { rooms: {}, clients: {} };
@@ -105,6 +127,53 @@ function pushMessage(room, message) {
   broadcast(room.code, { type: 'message', message });
 }
 
+async function enforceRoomRetention(room) {
+  const removed = [];
+  while (room.messages.length > MAX_ROOM_MESSAGES) {
+    removed.push(room.messages.shift());
+  }
+  for (const message of removed) {
+    if (message?.type === 'file' && message.file?.url) await deleteStoredFileByUrl(message.file.url);
+  }
+  if (removed.length) broadcast(room.code, { type: 'room-updated', room: publicRoom(room) });
+}
+
+async function deleteStoredFileByUrl(url) {
+  const storedName = storedNameFromFileUrl(url);
+  const filePath = resolveUploadPath(storedName);
+  if (!filePath) return;
+  await unlink(filePath).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+  });
+}
+
+async function getUploadBytes() {
+  const names = await readdir(UPLOAD_DIR).catch((error) => {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  });
+  let total = 0;
+  for (const name of names) {
+    const filePath = resolveUploadPath(name);
+    if (!filePath) continue;
+    const info = await stat(filePath).catch(() => null);
+    if (info?.isFile()) total += info.size;
+  }
+  return total;
+}
+
+function configSummary() {
+  return {
+    maxFileSize: MAX_FILE_SIZE,
+    maxTotalUploadBytes: MAX_TOTAL_UPLOAD_BYTES,
+    maxRoomMessages: MAX_ROOM_MESSAGES,
+    maxRooms: MAX_ROOMS,
+    maxTextLength: MAX_TEXT_LENGTH,
+    dataDir: DATA_DIR,
+    uploadDir: UPLOAD_DIR,
+  };
+}
+
 function canDeleteMessage(room, message, clientId) {
   return room.hostId === clientId || message.clientId === clientId;
 }
@@ -137,9 +206,20 @@ function resolveUploadPath(storedName) {
   return filePath;
 }
 
-app.get('/api/health', async () => ({ ok: true, rooms: Object.keys(db.rooms).length }));
+app.get('/api/health', async () => ({
+  ok: true,
+  rooms: Object.keys(db.rooms).length,
+  messages: Object.values(db.rooms).reduce((count, room) => count + (room.messages?.length || 0), 0),
+  uploadBytes: await getUploadBytes(),
+  config: configSummary(),
+}));
 
 app.post('/api/rooms', async (request) => {
+  if (Object.keys(db.rooms).length >= MAX_ROOMS) {
+    const error = new Error('Room limit reached');
+    error.statusCode = 507;
+    throw error;
+  }
   const name = String(request.body?.name || 'LAN Room').slice(0, 80);
   const hostName = String(request.body?.hostName || 'Host').slice(0, 40);
   const hostId = randomUUID();
@@ -218,7 +298,7 @@ app.post('/api/rooms/:code/messages', async (request) => {
   const room = requireRoom(request.params.code);
   const clientId = request.body?.clientId;
   requireApproved(room, clientId);
-  const text = String(request.body?.text || '').trim();
+  const text = String(request.body?.text || '').trim().slice(0, MAX_TEXT_LENGTH);
   if (!text) {
     const error = new Error('Message text is required');
     error.statusCode = 400;
@@ -233,6 +313,7 @@ app.post('/api/rooms/:code/messages', async (request) => {
     createdAt: new Date().toISOString(),
   };
   pushMessage(room, message);
+  await enforceRoomRetention(room);
   await saveDb();
   return { message };
 });
@@ -258,8 +339,16 @@ app.post('/api/rooms/:code/files', async (request, reply) => {
       const id = randomUUID();
       const storedName = `${id}-${safeName}`;
       const targetPath = join(UPLOAD_DIR, storedName);
+      const uploadBytesBefore = await getUploadBytes();
       await pipeline(part.file, createWriteStream(targetPath));
-      savedFile = { id, originalName: safeName, storedName, mimeType: part.mimetype };
+      const size = (await stat(targetPath)).size;
+      if (uploadBytesBefore + size > MAX_TOTAL_UPLOAD_BYTES) {
+        await unlink(targetPath).catch(() => {});
+        const error = new Error('Upload storage quota exceeded');
+        error.statusCode = 507;
+        throw error;
+      }
+      savedFile = { id, originalName: safeName, storedName, mimeType: part.mimetype, size };
     }
   }
 
@@ -279,10 +368,12 @@ app.post('/api/rooms/:code/files', async (request, reply) => {
       id: savedFile.id,
       name: savedFile.originalName,
       mimeType: savedFile.mimeType,
+      size: savedFile.size,
       url: `/api/files/${savedFile.storedName}`,
     },
   };
   pushMessage(room, message);
+  await enforceRoomRetention(room);
   await saveDb();
   return { message };
 });
@@ -305,15 +396,7 @@ app.delete('/api/rooms/:code/messages/:messageId', async (request) => {
   }
 
   room.messages = room.messages.filter((item) => item.id !== message.id);
-  if (message.type === 'file' && message.file?.url) {
-    const storedName = storedNameFromFileUrl(message.file.url);
-    const filePath = resolveUploadPath(storedName);
-    if (filePath) {
-      await unlink(filePath).catch((error) => {
-        if (error.code !== 'ENOENT') throw error;
-      });
-    }
-  }
+  if (message.type === 'file' && message.file?.url) await deleteStoredFileByUrl(message.file.url);
   await saveDb();
   const publicState = publicRoom(room);
   broadcast(room.code, { type: 'room-updated', room: publicState });

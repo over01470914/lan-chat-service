@@ -35,6 +35,9 @@ const sendButton = $('#sendButton');
 const fileDrawer = $('#fileDrawer');
 const drawerBackdrop = $('#drawerBackdrop');
 const contextMenu = $('#contextMenu');
+const RECENT_ROOMS_KEY = 'lan-chat-recent-rooms';
+
+renderRecentRooms();
 
 $('#createRoomForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -48,6 +51,11 @@ $('#createRoomForm').addEventListener('submit', async (event) => {
   localStorage.setItem('lan-chat-client-id', state.clientId);
   localStorage.setItem('lan-chat-role', state.role);
   enterRoom(result.room);
+});
+
+$('#clearRecentRoomsButton').addEventListener('click', () => {
+  localStorage.removeItem(RECENT_ROOMS_KEY);
+  renderRecentRooms();
 });
 
 $('#joinRoomForm').addEventListener('submit', async (event) => {
@@ -189,6 +197,7 @@ async function api(url, options = {}) {
 function enterRoom(room, status = 'approved') {
   state.room = room;
   state.accessStatus = status;
+  rememberRoom(room, status);
   landing.classList.add('hidden');
   chat.classList.remove('hidden');
   $('#roomTitle').textContent = room.name;
@@ -196,6 +205,79 @@ function enterRoom(room, status = 'approved') {
   updateAccess(room, status);
   renderRoom(room);
   connectSocket();
+}
+
+function loadRecentRooms() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_ROOMS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberRoom(room, status = 'approved') {
+  if (!room?.code || !state.clientId) return;
+  const item = {
+    code: room.code,
+    name: room.name,
+    role: state.role || 'client',
+    clientId: state.clientId,
+    status,
+    origin: location.origin,
+    lastOpenedAt: new Date().toISOString(),
+  };
+  const next = loadRecentRooms().filter((existing) => !(existing.origin === item.origin && existing.code === item.code && existing.clientId === item.clientId));
+  next.unshift(item);
+  localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(next.slice(0, 12)));
+  renderRecentRooms();
+}
+
+function forgetRecentRoom(index) {
+  const next = loadRecentRooms();
+  next.splice(index, 1);
+  localStorage.setItem(RECENT_ROOMS_KEY, JSON.stringify(next));
+  renderRecentRooms();
+}
+
+function renderRecentRooms() {
+  const section = $('#recentRooms');
+  const list = $('#recentRoomsList');
+  if (!section || !list) return;
+  const rooms = loadRecentRooms();
+  section.classList.toggle('hidden', rooms.length === 0);
+  if (!rooms.length) {
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = rooms.map((room, index) => `
+    <article class="recentRoomCard">
+      <button type="button" class="recentRoomOpen" data-open-recent="${index}">
+        <span class="recentRoomCode">${escapeHtml(room.code)}</span>
+        <span><strong>${escapeHtml(room.name || 'LAN Room')}</strong><small>${escapeHtml(room.role || 'client')} / ${new Date(room.lastOpenedAt).toLocaleString()}</small></span>
+      </button>
+      <button type="button" class="ghost small" data-forget-recent="${index}">移除</button>
+    </article>
+  `).join('');
+  list.querySelectorAll('[data-open-recent]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const item = loadRecentRooms()[Number(button.dataset.openRecent)];
+      if (!item) return;
+      try {
+        state.clientId = item.clientId;
+        state.role = item.role;
+        localStorage.setItem('lan-chat-client-id', state.clientId);
+        localStorage.setItem('lan-chat-role', state.role);
+        const result = await api(`/api/rooms/${item.code}`);
+        enterRoom(result.room, item.status || 'approved');
+      } catch {
+        alert('這個 Room 已不存在或目前無法連線。');
+      }
+    });
+  });
+  list.querySelectorAll('[data-forget-recent]').forEach((button) => {
+    button.addEventListener('click', () => forgetRecentRoom(Number(button.dataset.forgetRecent)));
+  });
 }
 
 function connectSocket() {

@@ -10,8 +10,9 @@ Build a browser-based LAN chat service where one machine acts as the host and ot
 - Approval: new clients wait for host approval before entering a room.
 - Rooms: one host can create and manage multiple rooms.
 - Persistence: chat metadata and uploaded files persist across restarts.
-- File limit: 500MB per upload.
-- Devices: desktop and mobile browsers on the same LAN.
+- File limit: configurable; default is 200MB per upload for 2C/8G/80GB VPS safety, can be raised to 500MB.
+- Storage guardrails: configurable total upload quota, room count cap, and per-room message retention.
+- Devices: desktop and mobile browsers on the same LAN, plus headless Linux CLI host/join/send/approve flows.
 - UI: minimal, modern, youthful, polished enough for daily use.
 
 ## Acceptance Criteria
@@ -19,8 +20,10 @@ Build a browser-based LAN chat service where one machine acts as the host and ot
 - AC-2: Given a room exists, when a client enters the room code and display name, then the host sees a pending approval request.
 - AC-3: Given the host approves a pending client, when the client sends text, then all approved participants in that room receive it in real time.
 - AC-4: Given an approved participant uploads a file under 500MB, then room participants receive a file message with a downloadable link.
-- AC-5: Given the server restarts, when the host/client reopens a room, then prior messages and file links are still available.
+- AC-5: Given the server restarts, when the host/client reopens a room, then retained messages and file links are still available.
 - AC-6: Given multiple rooms exist, when users join different rooms, then messages/files do not cross room boundaries.
+- AC-7: Given a Linux machine has no browser UI, when it runs the CLI host/join/send/approve commands, then it can create or participate in a room and receive room/client tokens.
+- AC-8: Given a browser has hosted or joined rooms before, when it opens the landing page, then recent rooms are available for quick re-entry.
 
 ## Non-goals
 - End-to-end encryption.
