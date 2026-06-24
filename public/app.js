@@ -140,7 +140,7 @@ $('#settingsButton')?.addEventListener('click', () => openUtilityPanel('settings
 $('#networkButton')?.addEventListener('click', () => openUtilityPanel('network'));
 $('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('review'));
 $('#sharePanelButton')?.addEventListener('click', () => openUtilityPanel('share'));
-$('#mobileShareButton')?.addEventListener('click', () => openUtilityPanel('share'));
+$('#mobileShareButton')?.addEventListener('click', openMobileShare);
 $('#closeUtilityButton')?.addEventListener('click', closeUtilityPanel);
 $('#utilityBody')?.addEventListener('click', async (event) => {
   const rotate = event.target.closest('[data-rotate-invite]');
@@ -806,6 +806,7 @@ function renderSessionCard() {
   }
   role.textContent = isHost ? 'Host' : state.accessStatus === 'approved' ? 'Client' : state.accessStatus;
   role.title = `加入時間 ${(joinedAt || new Date()).toLocaleTimeString()}`;
+  renderInviteSummary();
 }
 
 function updateSocketStatus(text) {
@@ -814,7 +815,11 @@ function updateSocketStatus(text) {
 }
 
 async function refreshHostInvite() {
-  if (!state.room || state.role !== 'host') return;
+  if (!state.room) return;
+  if (state.role !== 'host') {
+    renderInviteSummary();
+    return;
+  }
   if (state.invite?.roomCode === state.room.code) {
     renderInviteSummary();
     return;
@@ -825,6 +830,7 @@ async function refreshHostInvite() {
     renderInviteSummary();
   } catch (error) {
     console.warn('invite refresh failed', error);
+    renderInviteSummary();
   }
 }
 
@@ -838,7 +844,27 @@ async function rotateInviteToken() {
 
 function renderInviteSummary() {
   const target = $('#mobileInviteUrl');
-  if (target) target.textContent = inviteLink();
+  const mobileButton = $('#mobileShareButton');
+  const inviteButton = $('#copyInviteButton');
+  const isHost = state.role === 'host';
+  if (target) {
+    if (isHost && state.invite?.inviteUrl) target.textContent = state.invite.inviteUrl;
+    else if (isHost) target.textContent = 'URL+Token 生成中';
+    else target.textContent = inviteTokenFromUrl() ? 'Invite token 已套用' : 'Client mode / 已連線';
+  }
+  if (mobileButton) {
+    mobileButton.textContent = isHost ? '分享' : '房碼';
+    mobileButton.disabled = false;
+  }
+  if (inviteButton) {
+    inviteButton.disabled = !isHost || !state.invite?.inviteUrl;
+    inviteButton.textContent = isHost ? '複製 URL+Token' : 'Host 分享專用';
+  }
+}
+
+function openMobileShare() {
+  if (state.role === 'host') openUtilityPanel('share');
+  else copyRoomCode(false);
 }
 
 function renderUtilityBody(kind) {
@@ -847,10 +873,18 @@ function renderUtilityBody(kind) {
   const memberCount = room.approved?.length || 0;
   const pendingCount = room.pending?.length || 0;
   if (kind === 'share') {
+    if (state.role !== 'host') {
+      return `<div class="utilityGrid">
+        <div class="utilityMetric wide"><small>Room Code</small><strong>${escapeHtml(room.code)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(room.code)}" data-copy-label="已複製 Room Code">Copy</button></div>
+      </div><p class="utilityNote">你目前是 Client。只有 Host 會顯示 URL+Token 分享與重新生成 token；Client 只可複製 Room Code。</p>`;
+    }
+    const ready = Boolean(state.invite?.inviteUrl);
+    const url = ready ? inviteLink() : '生成中';
+    const token = state.invite?.inviteToken || '生成中';
     return `<div class="utilityGrid">
-      <div class="utilityMetric wide"><small>Mobile invite URL</small><strong>${escapeHtml(inviteLink())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(inviteLink())}" data-copy-label="已複製 mobile invite URL">Copy</button></div>
-      <div class="utilityMetric"><small>Room Token</small><strong>${escapeHtml(state.invite?.inviteToken || '載入中')}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(state.invite?.inviteToken || '')}" data-copy-label="已複製 token">Copy</button></div>
-      <div class="utilityMetric wide"><small>CLI / SSH handoff</small><strong>${escapeHtml(cliJoinCommand())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(cliJoinCommand())}" data-copy-label="已複製 CLI join command">Copy</button></div>
+      <div class="utilityMetric wide"><small>Mobile invite URL</small><strong>${escapeHtml(url)}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(url)}"` : 'disabled'} data-copy-label="已複製 mobile invite URL">Copy</button></div>
+      <div class="utilityMetric"><small>Room Token</small><strong>${escapeHtml(token)}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(state.invite.inviteToken)}"` : 'disabled'} data-copy-label="已複製 token">Copy</button></div>
+      <div class="utilityMetric wide"><small>CLI / SSH handoff</small><strong>${escapeHtml(ready ? cliJoinCommand() : '生成中')}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(cliJoinCommand())}"` : 'disabled'} data-copy-label="已複製 CLI join command">Copy</button></div>
       <div class="utilityMetric wide"><small>SSH tunnel hint</small><strong>${escapeHtml(sshTunnelHint())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(sshTunnelHint())}" data-copy-label="已複製 SSH tunnel hint">Copy</button></div>
     </div><p class="utilityNote">把 Mobile invite URL 傳給手機即可帶 token 加入並自動核准。Token 只允許加入，不含 Host 權限；需要失效舊連結時可重新生成。</p><button type="button" class="ghost" data-rotate-invite>重新生成 token</button>`;
   }

@@ -436,6 +436,7 @@ h3 { font-size: 1rem; }
 .utilityMetric strong { overflow-wrap: anywhere; }
 .metricCopy { justify-self: start; min-height: 28px; margin-top: .55rem; padding: .25rem .55rem; border-radius: 999px; color: var(--accent-ink); background: var(--accent); box-shadow: none; font: 900 .58rem var(--mono); text-transform: uppercase; letter-spacing: .1em; }
 .metricCopy:hover { background: #e5ff64; }
+.metricCopy:disabled { opacity: .5; cursor: wait; }
 .utilityNote { margin: 0; padding: .85rem; border: 1px solid rgba(216,255,56,.24); border-radius: var(--radius); color: var(--muted); background: rgba(216,255,56,.055); line-height: 1.55; }
 .toast { position: fixed; z-index: 80; left: 50%; bottom: 1.2rem; transform: translateX(-50%); padding: .72rem 1rem; border: 1px solid rgba(216,255,56,.45); border-radius: 999px; color: var(--accent-ink); background: var(--accent); box-shadow: 0 18px 60px rgba(0,0,0,.42); font-weight: 900; }
 .sessionLive .approvalIcon { background: var(--accent); }
@@ -508,6 +509,9 @@ h3 { font-size: 1rem; }
 .chatTabs { display: flex; align-items: center; gap: .45rem; min-width: 0; }
 .tabButton {
   min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: .38rem;
   color: #c0c8ca;
   background: transparent;
   border-radius: 0;
@@ -515,10 +519,11 @@ h3 { font-size: 1rem; }
   box-shadow: none;
   padding: .5rem .7rem;
   font-size: .78rem;
+  white-space: nowrap;
 }
 .tabButton.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tabButton:hover { transform: none; background: rgba(255,255,255,.04); }
-.tabButton b { margin-left: .35rem; padding: .1rem .35rem; border-radius: 999px; color: var(--accent-ink); background: var(--accent); }
+.tabButton b { margin-left: 0; padding: .1rem .38rem; border-radius: 999px; color: var(--accent-ink); background: var(--accent); line-height: 1.25; }
 .topActions { display: flex; align-items: center; gap: .55rem; }
 .statusCluster { display: flex; align-items: center; justify-content: flex-end; gap: .45rem; color: var(--muted); font-size: .78rem; }
 .statusCluster strong { color: var(--accent); }
@@ -566,12 +571,15 @@ h3 { font-size: 1rem; }
 .message {
   max-width: min(680px, 88%);
   padding: .82rem .95rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   border: 1px solid var(--line);
   border-radius: 16px 16px 16px 6px;
   background: rgba(255,255,255,.045);
 }
 .message.mine { align-self: flex-end; border-radius: 16px 16px 6px 16px; border-color: rgba(216,255,56,.35); background: rgba(216,255,56,.10); }
 .message.highlight { outline: 2px solid var(--accent); outline-offset: 3px; }
+.message a { overflow-wrap: anywhere; word-break: break-all; }
 .meta { display: flex; gap: .45rem; flex-wrap: wrap; margin-bottom: .42rem; color: var(--muted); font-size: .68rem; }
 .fileMessage { display: grid; gap: .55rem; }
 .fileCard {
@@ -668,7 +676,7 @@ h3 { font-size: 1rem; }
 .utilityMetric.wide { grid-column: 1 / -1; }
 .mobileRoomBar { display: none; }
 @media (max-width: 980px) {
-  .chat { display: flex; flex-direction: column; min-height: 100dvh; }
+  .chat { display: flex; flex-direction: column; min-height: 100dvh; padding-top: max(.5rem, env(safe-area-inset-top)); }
   .chatRail { display: none; }
   .sidebar { display: grid; max-height: 42dvh; overflow: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .operatorStamp { display: none; }
@@ -701,24 +709,27 @@ h3 { font-size: 1rem; }
   .arrowCta { width: 100%; height: auto; min-height: 46px; border-radius: 999px; }
   .recentRoomCard { grid-template-columns: 1fr; }
   .recentRoomOpen { grid-template-columns: 1fr; }
-  .chat { height: 100dvh; overflow: hidden; }
-  .sidebar { max-height: 34dvh; padding: .75rem; gap: .65rem; }
+  .chat { min-height: 100dvh; height: auto; overflow: visible; padding-top: max(.85rem, env(safe-area-inset-top)); }
+  .sidebar { max-height: none; padding: .8rem; gap: .75rem; }
   .roomBlock h2 { font-size: 1.15rem; }
   .roomCodeWrap { margin-top: .55rem; }
   .code { min-height: 48px; font-size: 1rem; padding: .65rem .75rem; }
   .roomCodeActions, .sideStats { grid-template-columns: 1fr; }
   .memberPanel { display: none; }
   .roomControl { grid-template-columns: 1fr 1fr; }
-  .controlRow { min-height: 38px; padding: .55rem .65rem; font-size: .68rem; }
+  .controlRow { min-height: 40px; padding: .58rem .7rem; font-size: .68rem; }
+  .leaveButton { min-height: 42px; padding: .62rem .75rem; }
   .pending { padding: .65rem; }
   .topbar { display: grid; align-items: start; gap: .7rem; padding: .75rem; min-height: 0; }
-  .chatTabs { overflow-x: auto; padding-bottom: .2rem; }
-  .topActions { flex-wrap: wrap; justify-content: stretch; }
+  .chatTabs { overflow-x: auto; padding-bottom: .25rem; gap: .35rem; scrollbar-width: none; }
+  .chatTabs::-webkit-scrollbar { display: none; }
+  .tabButton { flex: 0 0 auto; min-height: 34px; padding: .45rem .55rem; font-size: .72rem; gap: .28rem; }
+  .topActions { flex-wrap: wrap; justify-content: stretch; gap: .65rem; }
   .topActions > * { flex: 1 1 auto; }
-  .statusCluster { justify-content: flex-start; flex-basis: 100%; }
+  .statusCluster { justify-content: flex-start; flex-basis: 100%; padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(255,255,255,.04); }
   .approvalCard { grid-template-columns: 1fr; margin: .75rem .75rem 0; padding: .8rem; }
   .approvalMeta { grid-template-columns: 1fr 1fr; }
-  .messages { padding: .75rem; min-height: 0; }
+  .messages { padding: .75rem; min-height: 220px; overflow: visible; }
   .message { max-width: 96%; }
   .composer { grid-template-columns: 1fr auto; gap: .55rem; padding: .65rem; padding-bottom: max(.65rem, env(safe-area-inset-bottom)); }
   .attachmentList { max-height: 92px; overflow: auto; }
