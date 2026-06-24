@@ -40,6 +40,14 @@ const RECENT_ROOMS_KEY = 'lan-chat-recent-rooms';
 
 renderRecentRooms();
 prefillRoomCodeFromUrl();
+document.querySelector('[data-focus-room]')?.addEventListener('click', () => document.querySelector('[name=roomName]')?.focus());
+messageInput?.addEventListener('input', resizeComposer);
+messageInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    messageForm.requestSubmit();
+  }
+});
 let joinedAt = null;
 let toastTimer = null;
 
@@ -85,6 +93,7 @@ messageForm.addEventListener('submit', async (event) => {
   if (!text && !attachments.length) return;
 
   messageInput.value = '';
+  resizeComposer();
   state.pendingAttachments = [];
   renderAttachments();
 
@@ -327,7 +336,7 @@ function renderRecentRooms() {
     <article class="recentRoomCard">
       <button type="button" class="recentRoomOpen" data-open-recent="${index}">
         <span class="recentRoomCode">${escapeHtml(room.code)}</span>
-        <span><strong>${escapeHtml(room.name || 'LAN Room')}</strong><small>${escapeHtml(room.role || 'client')} / ${new Date(room.lastOpenedAt).toLocaleString()}</small></span>
+        <span><strong>${escapeHtml(room.name || 'LAN Room')}</strong><small>${room.role === 'host' ? '你開的房間' : '你加入過'} · ${new Date(room.lastOpenedAt).toLocaleString()}</small></span>
       </button>
       <button type="button" class="ghost small" data-forget-recent="${index}">移除</button>
     </article>
@@ -404,7 +413,7 @@ function updateAccess(room, statusHint) {
   messageInput.disabled = disabled;
   fileInput.disabled = disabled;
   sendButton.disabled = disabled;
-  messageInput.placeholder = disabled ? '等待 Host 審核後才能輸入訊息' : '輸入訊息或貼上連結';
+  messageInput.placeholder = disabled ? 'Host 批准後才能發訊息' : '輸入訊息或貼上連結';
   $('.fileButton').classList.toggle('disabled', disabled);
   chat.classList.toggle('access-pending', state.accessStatus === 'pending');
   chat.classList.toggle('access-rejected', state.accessStatus === 'rejected');
@@ -791,18 +800,18 @@ function renderSessionCard() {
   if (state.accessStatus === 'pending') {
     card.classList.add('sessionPending');
     icon.textContent = '…';
-    title.textContent = '等待 Host 核准加入';
-    text.textContent = '你的請求已送出。核准後即可存取聊天室、檔案庫與上傳功能。';
+    title.textContent = '等 Host 放行';
+    text.textContent = '申請已送出。通過後就能聊天、傳檔、看檔案庫。';
   } else if (state.accessStatus === 'rejected') {
     card.classList.add('sessionRejected');
     icon.textContent = '×';
-    title.textContent = '此身份已被拒絕';
-    text.textContent = 'Host 拒絕了這個 clientId。請回首頁重新申請或請 Host 重新核准。';
+    title.textContent = '這個身份進不去';
+    text.textContent = 'Host 拒絕了這個 clientId。回首頁換個名字申請，或請 Host 重新放行。';
   } else {
     card.classList.add('sessionLive');
     icon.textContent = isHost ? '⌁' : '✓';
-    title.textContent = isHost ? 'Host control plane 已就緒' : '你已進入 Room';
-    text.textContent = isHost ? '可審核成員、分享 Room Code、切換 Auto approve，或打開檔案庫查看傳輸狀態。' : '你可以傳訊息、上傳檔案，並從檔案庫搜尋已核准的資源。';
+    title.textContent = isHost ? '房間已開好' : '你已進房';
+    text.textContent = isHost ? '現在可以放人進來、發房碼、切 Auto approve，或看檔案庫。' : '可以聊天、傳檔，也可以在檔案庫裡找之前傳過的東西。';
   }
   role.textContent = isHost ? 'Host' : state.accessStatus === 'approved' ? 'Client' : state.accessStatus;
   role.title = `加入時間 ${(joinedAt || new Date()).toLocaleTimeString()}`;
@@ -867,6 +876,29 @@ function openMobileShare() {
   else copyRoomCode(false);
 }
 
+function renderShareRow(label, value, copyValue, copyLabel, note = '') {
+  const copyButton = copyValue
+    ? `<button type="button" class="copyMini" data-copy-value="${escapeHtml(copyValue)}" data-copy-label="${escapeHtml(copyLabel)}">Copy</button>`
+    : '';
+  const noteHtml = note ? `<p>${escapeHtml(note)}</p>` : '';
+  return `<div class="shareRow">
+    <div class="shareRowHead"><small>${escapeHtml(label)}</small>${copyButton}</div>
+    <code class="shareValue">${escapeHtml(value)}</code>
+    ${noteHtml}
+  </div>`;
+}
+
+function renderInfoRow(label, value, note = '', copyValue = '', copyLabel = '已複製') {
+  return renderShareRow(label, value, copyValue, copyLabel, note);
+}
+
+function resizeComposer() {
+  if (!messageInput || !('style' in messageInput)) return;
+  messageInput.style.height = 'auto';
+  const cap = window.matchMedia('(max-width: 980px)').matches ? 116 : 148;
+  messageInput.style.height = `${Math.min(messageInput.scrollHeight, cap)}px`;
+}
+
 function renderUtilityBody(kind) {
   const room = state.room;
   const fileCount = getFileItems().length;
@@ -874,40 +906,43 @@ function renderUtilityBody(kind) {
   const pendingCount = room.pending?.length || 0;
   if (kind === 'share') {
     if (state.role !== 'host') {
-      return `<div class="utilityGrid">
-        <div class="utilityMetric wide"><small>Room Code</small><strong>${escapeHtml(room.code)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(room.code)}" data-copy-label="已複製 Room Code">Copy</button></div>
-      </div><p class="utilityNote">你目前是 Client。只有 Host 會顯示 URL+Token 分享與重新生成 token；Client 只可複製 Room Code。</p>`;
+      return `<div class="shareList">
+        ${renderInfoRow('Room Code', room.code, '把這組房碼給同網路裡的人，他們就能送出加入請求。', room.code, '已複製 Room Code')}
+        ${renderInfoRow('你的身分', 'Client', '只有 Host 會看到 token 分享與重新生成按鈕。')}
+      </div><p class="utilityNote">你目前不是 Host，所以這裡只保留房碼。</p>`;
     }
     const ready = Boolean(state.invite?.inviteUrl);
     const url = ready ? inviteLink() : '生成中';
     const token = state.invite?.inviteToken || '生成中';
-    return `<div class="utilityGrid">
-      <div class="utilityMetric wide"><small>Mobile invite URL</small><strong>${escapeHtml(url)}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(url)}"` : 'disabled'} data-copy-label="已複製 mobile invite URL">Copy</button></div>
-      <div class="utilityMetric"><small>Room Token</small><strong>${escapeHtml(token)}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(state.invite.inviteToken)}"` : 'disabled'} data-copy-label="已複製 token">Copy</button></div>
-      <div class="utilityMetric wide"><small>CLI / SSH handoff</small><strong>${escapeHtml(ready ? cliJoinCommand() : '生成中')}</strong><button type="button" class="metricCopy" ${ready ? `data-copy-value="${escapeHtml(cliJoinCommand())}"` : 'disabled'} data-copy-label="已複製 CLI join command">Copy</button></div>
-      <div class="utilityMetric wide"><small>SSH tunnel hint</small><strong>${escapeHtml(sshTunnelHint())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(sshTunnelHint())}" data-copy-label="已複製 SSH tunnel hint">Copy</button></div>
-    </div><p class="utilityNote">把 Mobile invite URL 傳給手機即可帶 token 加入並自動核准。Token 只允許加入，不含 Host 權限；需要失效舊連結時可重新生成。</p><button type="button" class="ghost" data-rotate-invite>重新生成 token</button>`;
+    return `<div class="shareList">
+      ${renderShareRow('手機連結', url, ready ? url : '', '已複製手機邀請連結')}
+      ${renderShareRow('Room token', token, ready ? state.invite.inviteToken : '', '已複製 token')}
+      ${renderShareRow('終端機加入指令', ready ? cliJoinCommand() : '生成中', ready ? cliJoinCommand() : '', '已複製 CLI 指令')}
+      ${renderShareRow('SSH tunnel 範例', sshTunnelHint(), sshTunnelHint(), '已複製 SSH tunnel 範例')}
+    </div><p class="utilityNote">把手機連結發出去，對方打開就能進房。Token 只能加入，沒有 Host 權限；要讓舊連結失效就重新生成。</p><button type="button" class="ghost" data-rotate-invite>重新生成 token</button>`;
   }
   if (kind === 'network') {
-    return `<div class="utilityGrid">
-      <div class="utilityMetric"><small>Origin</small><strong>${escapeHtml(location.origin)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(location.origin)}" data-copy-label="已複製 Origin">Copy</button></div>
-      <div class="utilityMetric"><small>WebSocket</small><strong>${escapeHtml($('#socketStatusMeta')?.textContent || '未知')}</strong></div>
-      <div class="utilityMetric"><small>Room Code</small><strong>${escapeHtml(room.code)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(room.code)}" data-copy-label="已複製 Room Code">Copy</button></div>
-      <div class="utilityMetric"><small>Peer / Pending</small><strong>${memberCount} / ${pendingCount}</strong></div>
-    </div><p class="utilityNote">這裡對應概念圖的網路資訊入口：用來快速確認 LAN origin、WebSocket 狀態、Room Code 與 peer 數量。</p>`;
+    const socketState = $('#socketStatusMeta')?.textContent || '未知';
+    return `<div class="shareList">
+      ${renderInfoRow('服務位址', location.origin, '同網路設備能連到這個位址，就能打開房間。', location.origin, '已複製服務位址')}
+      ${renderInfoRow('WebSocket', socketState, '用來確認聊天室是否仍在線。')}
+      ${renderInfoRow('Room Code', room.code, '手機或另一台電腦手動加入時會用到。', room.code, '已複製 Room Code')}
+      ${renderInfoRow('成員 / 待審核', `${memberCount} / ${pendingCount}`, '左側審核清單會顯示每個等待加入的人。')}
+    </div><p class="utilityNote">這裡只放連線排查會用到的資料。能複製的值放在右上角，說明文字獨立放下面，不再和按鈕擠在同一行。</p>`;
   }
   if (kind === 'settings') {
-    return `<div class="utilityGrid">
-      <div class="utilityMetric"><small>Auto approve</small><strong>${room.autoApprove ? 'ON' : 'OFF'}</strong></div>
-      <div class="utilityMetric"><small>你的角色</small><strong>${escapeHtml(state.role || 'client')}</strong></div>
-      <div class="utilityMetric"><small>檔案庫</small><strong>${fileCount} files</strong></div>
-      <div class="utilityMetric"><small>邀請連結</small><strong>${escapeHtml(inviteLink())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(inviteLink())}" data-copy-label="已複製邀請連結">Copy</button></div>
-    </div><p class="utilityNote">Host 可直接在上方切換 Auto approve。邀請連結會預填加入 Room 的代碼，降低手動輸入錯誤。</p>`;
+    const approveText = room.autoApprove ? '開啟' : '關閉';
+    return `<div class="shareList">
+      ${renderInfoRow('Auto approve', approveText, room.autoApprove ? '知道房碼的人可以直接進房，適合臨時測試。' : '新成員需要 Host 在左側手動核准。')}
+      ${renderInfoRow('你的角色', state.role === 'host' ? 'Host' : 'Client', state.role === 'host' ? '你可以核准成員、重新生成 token、管理分享連結。' : '你可以聊天與上傳檔案，但不能管理房間。')}
+      ${renderInfoRow('檔案庫', `${fileCount} files`, '所有房間附件都會出現在右側檔案庫。')}
+      ${renderInfoRow('邀請連結', inviteLink(), '這個連結會預填房碼。若你是 Host，也會帶入 token。', inviteLink(), '已複製邀請連結')}
+    </div><p class="utilityNote">房間設定只保留會影響加入與交付的資訊。需要改放行方式時，回到聊天頁上方切換 Auto approve。</p>`;
   }
-  return `<div class="utilityGrid">
-    <div class="utilityMetric"><small>待審核</small><strong>${pendingCount}</strong></div>
-    <div class="utilityMetric"><small>已核准成員</small><strong>${memberCount}</strong></div>
-    <div class="utilityMetric"><small>檔案數</small><strong>${fileCount}</strong></div>
-    <div class="utilityMetric"><small>狀態</small><strong>${escapeHtml(state.accessStatus)}</strong></div>
-  </div><p class="utilityNote">待審核清單仍保留在左側 sidebar，Host 可以逐筆允許或拒絕。此面板補足概念圖中的審核總覽層。</p>`;
+  return `<div class="shareList">
+    ${renderInfoRow('待審核', `${pendingCount}`, pendingCount ? '有人正在等 Host 放行。回到左側審核清單處理。' : '目前沒有人在等審核。')}
+    ${renderInfoRow('已核准成員', `${memberCount}`, '已經能進房聊天或傳檔的人數。')}
+    ${renderInfoRow('檔案數', `${fileCount}`, '這個房間目前留下的附件數量。')}
+    ${renderInfoRow('目前狀態', state.accessStatus === 'approved' ? '可聊天' : state.accessStatus, state.accessStatus === 'approved' ? '你已經在房間裡，可以直接發訊息。' : '等待 Host 處理前，聊天與上傳會暫停。')}
+  </div><p class="utilityNote">審核操作仍放在左側 sidebar。這裡只做總覽，避免把按鈕和數字擠成一團。</p>`;
 }
