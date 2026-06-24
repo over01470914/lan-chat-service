@@ -38,6 +38,9 @@ const contextMenu = $('#contextMenu');
 const RECENT_ROOMS_KEY = 'lan-chat-recent-rooms';
 
 renderRecentRooms();
+prefillRoomCodeFromUrl();
+let joinedAt = null;
+let toastTimer = null;
 
 $('#createRoomForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -125,10 +128,24 @@ $('#leaveButton').addEventListener('click', () => {
 });
 
 $('#drawerButton').addEventListener('click', openDrawer);
+$('#drawerShortcutButton')?.addEventListener('click', openDrawer);
 $('#closeDrawerButton').addEventListener('click', closeDrawer);
+$('#copyRoomCodeButton')?.addEventListener('click', () => copyRoomCode(false));
+$('#copyPlainCodeButton')?.addEventListener('click', () => copyRoomCode(false));
+$('#copyInviteButton')?.addEventListener('click', () => copyRoomCode(true));
+$('#settingsButton')?.addEventListener('click', () => openUtilityPanel('settings'));
+$('#networkButton')?.addEventListener('click', () => openUtilityPanel('network'));
+$('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('review'));
+$('#closeUtilityButton')?.addEventListener('click', closeUtilityPanel);
+$('#utilityBody')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-copy-value]');
+  if (!button) return;
+  copyText(button.dataset.copyValue || '', button.dataset.copyLabel || '已複製');
+});
 drawerBackdrop.addEventListener('click', () => {
   closeDrawer();
   closeSearch();
+  closeUtilityPanel();
 });
 $('#fileSearchInput').addEventListener('input', (event) => {
   state.fileSearch = event.target.value;
@@ -168,6 +185,7 @@ document.addEventListener('keydown', (event) => {
     hideContextMenu();
     closeDrawer();
     closeSearch();
+    closeUtilityPanel();
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f' && state.room) {
     event.preventDefault();
@@ -177,25 +195,47 @@ document.addEventListener('keydown', (event) => {
 
 function openDrawer() {
   fileDrawer.classList.add('open');
-  drawerBackdrop.classList.remove('hidden');
+  syncBackdrop();
   renderFileDrawer();
 }
 
 function closeDrawer() {
   fileDrawer.classList.remove('open');
-  if ($('#searchModal').classList.contains('hidden')) drawerBackdrop.classList.add('hidden');
+  syncBackdrop();
 }
 
 function openSearch() {
   $('#searchModal').classList.remove('hidden');
-  drawerBackdrop.classList.remove('hidden');
+  syncBackdrop();
   $('#globalSearchInput').focus();
   renderSearchResults();
 }
 
 function closeSearch() {
   $('#searchModal').classList.add('hidden');
-  if (!fileDrawer.classList.contains('open')) drawerBackdrop.classList.add('hidden');
+  syncBackdrop();
+}
+
+function openUtilityPanel(kind) {
+  if (!state.room) return;
+  const modal = $('#utilityModal');
+  $('#utilityKicker').textContent = kind === 'network' ? 'Network' : kind === 'settings' ? 'Settings' : 'Review';
+  $('#utilityTitle').textContent = kind === 'network' ? '網路資訊' : kind === 'settings' ? '房間設定' : '成員與審核';
+  $('#utilityBody').innerHTML = renderUtilityBody(kind);
+  modal.classList.remove('hidden');
+  syncBackdrop();
+}
+
+function closeUtilityPanel() {
+  $('#utilityModal')?.classList.add('hidden');
+  syncBackdrop();
+}
+
+function syncBackdrop() {
+  const searchOpen = !$('#searchModal').classList.contains('hidden');
+  const utilityOpen = !$('#utilityModal')?.classList.contains('hidden');
+  const drawerOpen = fileDrawer.classList.contains('open');
+  drawerBackdrop.classList.toggle('hidden', !(searchOpen || utilityOpen || drawerOpen));
 }
 
 async function api(url, options = {}) {
@@ -214,6 +254,7 @@ async function api(url, options = {}) {
 
 function enterRoom(room, status = 'approved') {
   state.room = room;
+  joinedAt = new Date();
   state.accessStatus = deriveAccessStatus(room, status);
   rememberRoom(room, state.accessStatus);
   landing.classList.add('hidden');
@@ -222,6 +263,7 @@ function enterRoom(room, status = 'approved') {
   $('#roomCode').textContent = room.code;
   updateAccess(room, status);
   renderRoom(room);
+  renderSessionCard();
   connectSocket();
 }
 
@@ -313,7 +355,11 @@ function deriveAccessStatus(room, statusHint) {
 function connectSocket() {
   if (state.socket) state.socket.close();
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  updateSocketStatus('連線中');
   state.socket = new WebSocket(`${protocol}://${location.host}/ws?roomCode=${state.room.code}&clientId=${state.clientId}`);
+  state.socket.addEventListener('open', () => updateSocketStatus('WS LIVE'));
+  state.socket.addEventListener('close', () => updateSocketStatus('離線'));
+  state.socket.addEventListener('error', () => updateSocketStatus('連線錯誤'));
   state.socket.addEventListener('message', (event) => {
     const payload = JSON.parse(event.data);
     if (payload.type === 'message') {
@@ -371,6 +417,7 @@ function updateAccess(room, statusHint) {
 
   $('#roleText').textContent = isHost ? `Host mode / Auto approve ${room.autoApprove ? 'ON' : 'OFF'}` : state.accessStatus === 'approved' ? 'Client mode' : state.accessStatus === 'rejected' ? '已被 Host 拒絕' : '等待 Host 審核';
   $('#statusText').textContent = state.accessStatus === 'rejected' ? '已拒絕' : state.accessStatus === 'pending' ? '待審核中，暫不可發言' : '已連線';
+  renderSessionCard();
 }
 
 function addAttachments(fileList) {
@@ -407,19 +454,27 @@ function renderRoom(room) {
   renderAttachments();
   renderFileDrawer();
   renderSearchResults();
+  renderSessionCard();
 }
 
 function renderMembers(room) {
-  $('#memberList').innerHTML = room.approved.map((member) => `<div class="person"><span>${escapeHtml(member.name)}</span><small>${member.role}</small></div>`).join('');
+  const approved = room.approved || [];
+  const host = approved.find((member) => member.role === 'host') || approved[0];
+  $('#memberCountHint').textContent = `${approved.length} / 24`;
+  $('#hostHint').textContent = host ? `${host.name} ${host.role === 'host' ? '(Host)' : ''}` : '未指定';
+  $('#memberList').innerHTML = approved.map((member) => `<div class="person" data-initial="${escapeHtml((member.name || '?').slice(0, 1))}"><span>${escapeHtml(member.name)}</span><small>${escapeHtml(member.role)}</small></div>`).join('');
 }
 
 function renderPending(room) {
   const box = $('#pendingBox');
   const list = $('#pendingList');
   const isHost = state.role === 'host';
+  const pendingCount = room.pending?.length || 0;
+  $('#pendingCountHint').textContent = pendingCount;
+  $('#topPendingHint').textContent = pendingCount;
   box.classList.toggle('hidden', !isHost);
   if (!isHost) return;
-  list.innerHTML = room.pending.length ? room.pending.map((member) => `
+  list.innerHTML = pendingCount ? room.pending.map((member) => `
     <div class="pendingRow">
       <span>${escapeHtml(member.name)}</span>
       <div class="pendingActions">
@@ -490,6 +545,8 @@ function renderCategoryTabs() {
 function renderFileDrawer() {
   if (!state.room) return;
   renderCategoryTabs();
+  const allFiles = getFileItems();
+  $('#fileVaultSummary').textContent = `共 ${allFiles.length} 個檔案`;
   const files = getFilteredFileItems();
   const list = $('#fileList');
   if (!files.length) {
@@ -500,6 +557,7 @@ function renderFileDrawer() {
     <article class="drawerFile" data-file-message-id="${file.messageId}">
       <span class="fileIcon">${file.shortType}</span>
       <div><div class="fileName">${escapeHtml(file.name)}</div><div class="fileMeta">${file.categoryLabel} / ${escapeHtml(file.authorName)} / ${new Date(file.createdAt).toLocaleDateString()}</div></div>
+      <span class="fileStatus">已核准</span>
       ${renderFilePreview(file)}
     </article>
   `).join('');
@@ -642,4 +700,111 @@ function linkify(text) {
 
 function escapeHtml(value) {
   return String(value || '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+}
+
+
+function prefillRoomCodeFromUrl() {
+  const code = new URLSearchParams(location.search).get('room');
+  const input = document.querySelector('[name="roomCode"]');
+  if (code && input) input.value = code.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+}
+
+function inviteLink() {
+  if (!state.room?.code) return location.origin;
+  const url = new URL(location.origin);
+  url.searchParams.set('room', state.room.code);
+  return url.toString();
+}
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  }
+  showToast(label);
+}
+
+function copyRoomCode(withLink) {
+  if (!state.room?.code) return;
+  const text = withLink ? `${state.room.name} / ${state.room.code} / ${inviteLink()}` : state.room.code;
+  copyText(text, withLink ? '已複製邀請連結' : '已複製 Room Code');
+}
+
+function showToast(text) {
+  const toast = $('#toast');
+  if (!toast) return;
+  toast.textContent = text;
+  toast.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add('hidden'), 1800);
+}
+
+function renderSessionCard() {
+  if (!state.room) return;
+  const isHost = state.role === 'host';
+  const title = $('#sessionTitle');
+  const text = $('#sessionText');
+  const role = $('#sessionRoleMeta');
+  const icon = $('#sessionIcon');
+  const card = $('#sessionCard');
+  if (!title || !text || !role || !icon || !card) return;
+  card.classList.remove('sessionLive', 'sessionPending', 'sessionRejected');
+  if (state.accessStatus === 'pending') {
+    card.classList.add('sessionPending');
+    icon.textContent = '…';
+    title.textContent = '等待 Host 核准加入';
+    text.textContent = '你的請求已送出。核准後即可存取聊天室、檔案庫與上傳功能。';
+  } else if (state.accessStatus === 'rejected') {
+    card.classList.add('sessionRejected');
+    icon.textContent = '×';
+    title.textContent = '此身份已被拒絕';
+    text.textContent = 'Host 拒絕了這個 clientId。請回首頁重新申請或請 Host 重新核准。';
+  } else {
+    card.classList.add('sessionLive');
+    icon.textContent = isHost ? '⌁' : '✓';
+    title.textContent = isHost ? 'Host control plane 已就緒' : '你已進入 Room';
+    text.textContent = isHost ? '可審核成員、分享 Room Code、切換 Auto approve，或打開檔案庫查看傳輸狀態。' : '你可以傳訊息、上傳檔案，並從檔案庫搜尋已核准的資源。';
+  }
+  role.textContent = isHost ? 'Host' : state.accessStatus === 'approved' ? 'Client' : state.accessStatus;
+  role.title = `加入時間 ${(joinedAt || new Date()).toLocaleTimeString()}`;
+}
+
+function updateSocketStatus(text) {
+  const meta = $('#socketStatusMeta');
+  if (meta) meta.textContent = text;
+}
+
+function renderUtilityBody(kind) {
+  const room = state.room;
+  const fileCount = getFileItems().length;
+  const memberCount = room.approved?.length || 0;
+  const pendingCount = room.pending?.length || 0;
+  if (kind === 'network') {
+    return `<div class="utilityGrid">
+      <div class="utilityMetric"><small>Origin</small><strong>${escapeHtml(location.origin)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(location.origin)}" data-copy-label="已複製 Origin">Copy</button></div>
+      <div class="utilityMetric"><small>WebSocket</small><strong>${escapeHtml($('#socketStatusMeta')?.textContent || '未知')}</strong></div>
+      <div class="utilityMetric"><small>Room Code</small><strong>${escapeHtml(room.code)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(room.code)}" data-copy-label="已複製 Room Code">Copy</button></div>
+      <div class="utilityMetric"><small>Peer / Pending</small><strong>${memberCount} / ${pendingCount}</strong></div>
+    </div><p class="utilityNote">這裡對應概念圖的網路資訊入口：用來快速確認 LAN origin、WebSocket 狀態、Room Code 與 peer 數量。</p>`;
+  }
+  if (kind === 'settings') {
+    return `<div class="utilityGrid">
+      <div class="utilityMetric"><small>Auto approve</small><strong>${room.autoApprove ? 'ON' : 'OFF'}</strong></div>
+      <div class="utilityMetric"><small>你的角色</small><strong>${escapeHtml(state.role || 'client')}</strong></div>
+      <div class="utilityMetric"><small>檔案庫</small><strong>${fileCount} files</strong></div>
+      <div class="utilityMetric"><small>邀請連結</small><strong>${escapeHtml(inviteLink())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(inviteLink())}" data-copy-label="已複製邀請連結">Copy</button></div>
+    </div><p class="utilityNote">Host 可直接在上方切換 Auto approve。邀請連結會預填加入 Room 的代碼，降低手動輸入錯誤。</p>`;
+  }
+  return `<div class="utilityGrid">
+    <div class="utilityMetric"><small>待審核</small><strong>${pendingCount}</strong></div>
+    <div class="utilityMetric"><small>已核准成員</small><strong>${memberCount}</strong></div>
+    <div class="utilityMetric"><small>檔案數</small><strong>${fileCount}</strong></div>
+    <div class="utilityMetric"><small>狀態</small><strong>${escapeHtml(state.accessStatus)}</strong></div>
+  </div><p class="utilityNote">待審核清單仍保留在左側 sidebar，Host 可以逐筆允許或拒絕。此面板補足概念圖中的審核總覽層。</p>`;
 }
