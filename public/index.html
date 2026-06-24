@@ -3,39 +3,70 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="LAN Chat 是局域網內使用的房間聊天與檔案交換服務，支援 Host 審核、Auto approve、訊息搜尋與檔案抽屜。" />
+    <meta name="theme-color" content="#0b1016" />
     <title>LAN Chat</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <a class="skipLink" href="#landing">跳到主要內容</a>
     <main class="shell">
-      <section id="landing" class="panel landing">
-        <div class="landingCopy">
-          <p class="eyebrow">LAN ROOM</p>
-          <h1>Local files, quiet chat.</h1>
-          <p class="subtle">同一個局域網內，開房、審核、聊天、傳檔。所有內容留在 Host 這台機器。</p>
+      <section id="landing" class="panel landing" aria-labelledby="landingTitle">
+        <div class="landingHero">
+          <div class="landingCopy">
+            <p class="eyebrow">LAN Chat Service</p>
+            <h1 id="landingTitle">房間、檔案、審核都留在 Host。</h1>
+            <p class="subtle">給 Mac mini、Linux CLI 與局域網設備使用的輕量交接室。建立 Room Code，批准成員，直接收發訊息與安裝包。</p>
+          </div>
+          <div class="signalCard" aria-hidden="true">
+            <div class="signalHeader">
+              <span>Room topology</span>
+              <strong>Ready</strong>
+            </div>
+            <div class="nodeMap">
+              <span class="node nodeHost">Host</span>
+              <span class="node nodeCli">CLI</span>
+              <span class="node nodeWeb">Web</span>
+              <span class="node nodeFile">Files</span>
+            </div>
+            <div class="signalList">
+              <span><strong>審核</strong><small>Host first</small></span>
+              <span><strong>傳檔</strong><small>Streamed</small></span>
+              <span><strong>搜尋</strong><small>Room scoped</small></span>
+            </div>
+          </div>
         </div>
-        <div class="grid two">
-          <form id="createRoomForm" class="card">
-            <h2>成為 Host</h2>
-            <label>房間名稱 <input name="roomName" placeholder="Studio Room" /></label>
-            <label>你的名稱 <input name="hostName" placeholder="Host" /></label>
+
+        <div class="grid two actionGrid">
+          <form id="createRoomForm" class="card createCard">
+            <div class="cardHeader">
+              <span class="cardKicker">Host</span>
+              <h2>建立一間 Room</h2>
+              <p>適合你要當收件端、審核加入者，或把 APK / summary 放到同一個交接點。</p>
+            </div>
+            <label>房間名稱 <input name="roomName" placeholder="Artifact Room" /></label>
+            <label>你的名稱 <input name="hostName" placeholder="Boss Mac mini" /></label>
             <label class="toggleRow">
               <input name="autoApprove" type="checkbox" />
               <span><strong>自動批准加入</strong><small>適合 Linux CLI / 無畫面節點；知道 Room Code 即可直接進房。</small></span>
             </label>
             <button type="submit">建立 Room</button>
           </form>
-          <form id="joinRoomForm" class="card mutedCard">
-            <h2>加入 Room</h2>
-            <label>Room Code <input name="roomCode" maxlength="6" placeholder="ABC123" required /></label>
+          <form id="joinRoomForm" class="card joinCard">
+            <div class="cardHeader">
+              <span class="cardKicker">Client</span>
+              <h2>加入現有 Room</h2>
+              <p>輸入 Host 給你的 Room Code。若尚未批准，聊天與上傳會先鎖定。</p>
+            </div>
+            <label>Room Code <input name="roomCode" maxlength="6" placeholder="K7M2QA" required /></label>
             <label>你的名稱 <input name="clientName" placeholder="Naya" required /></label>
-            <button type="submit">送出加入申請</button>
+            <button type="submit" class="secondaryAction">送出加入申請</button>
           </form>
         </div>
         <section id="recentRooms" class="recentRooms hidden" aria-label="最近房間">
           <div class="sectionHeader">
             <div>
-              <p class="eyebrow">RECENTS</p>
+              <span class="cardKicker">Recent rooms</span>
               <h2>曾經加入 / Host 的 Room</h2>
             </div>
             <button id="clearRecentRoomsButton" type="button" class="ghost small">清空</button>
@@ -44,10 +75,10 @@
         </section>
       </section>
 
-      <section id="chat" class="panel chat hidden">
+      <section id="chat" class="panel chat hidden" aria-label="LAN Chat Room">
         <aside class="sidebar">
-          <div>
-            <p class="eyebrow">ROOM</p>
+          <div class="roomBlock">
+            <p class="eyebrow">Room</p>
             <h2 id="roomTitle">Room</h2>
             <div class="code" id="roomCode">------</div>
           </div>
@@ -78,7 +109,7 @@
             </div>
           </header>
           <div id="accessNotice" class="accessNotice hidden" role="status" aria-live="polite">
-            <div class="noticeIcon">⌛</div>
+            <div class="noticeIcon">WAIT</div>
             <div>
               <strong id="accessNoticeTitle">等待 Host 審核</strong>
               <p id="accessNoticeText">目前不能打字或上傳檔案。請等 Host 批准，或請 Host 開啟 Auto approve。</p>
@@ -96,7 +127,7 @@
         <aside id="fileDrawer" class="fileDrawer" aria-label="檔案預覽抽屜">
           <div class="drawerHeader">
             <div>
-              <p class="eyebrow">FILES</p>
+              <p class="eyebrow">Files</p>
               <h2>Room Vault</h2>
             </div>
             <button id="closeDrawerButton" type="button" class="ghost small">關閉</button>
@@ -114,7 +145,7 @@
       <div class="modalCard">
         <div class="modalHeader">
           <div>
-            <p class="eyebrow">FIND</p>
+            <p class="eyebrow">Find</p>
             <h2>查找訊息與檔案</h2>
           </div>
           <button id="closeSearchButton" type="button" class="ghost small">關閉</button>
