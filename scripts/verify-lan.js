@@ -19,6 +19,12 @@ try {
   const beta = await createRoom('Beta Room', 'Beta Host');
   assert(alpha.room.code !== beta.room.code, 'rooms have distinct codes');
 
+  assert(alpha.invite?.inviteToken, 'alpha invite token exists');
+  const mobileJoin = await post(`/api/rooms/${alpha.room.code}/join`, { name: 'Mobile Token Client', inviteToken: alpha.invite.inviteToken });
+  assert(mobileJoin.status === 'approved', 'mobile token client auto approved');
+  const rotatedInvite = await post(`/api/rooms/${alpha.room.code}/invite/rotate`, { hostId: alpha.clientId });
+  assert(rotatedInvite.invite.inviteToken !== alpha.invite.inviteToken, 'rotated invite token changes');
+
   const alphaClient = await joinAndApprove(alpha, 'Alpha Client');
   const betaClient = await joinAndApprove(beta, 'Beta Client');
 
@@ -76,6 +82,8 @@ try {
     rooms: [alpha.room.code, beta.room.code],
     checks: [
       'api health',
+      'invite token auto approval',
+      'invite token rotation',
       'multi-room isolation',
       'persistence after restart',
       'file download',

@@ -109,7 +109,7 @@
               <span>房間代碼</span>
               <button type="button" class="code copyCodeButton" id="copyRoomCodeButton" aria-label="複製 Room Code"><span id="roomCode">------</span><small>Copy</small></button>
               <div class="roomCodeActions">
-                <button type="button" class="ghost small" id="copyInviteButton">複製邀請連結</button>
+                <button type="button" class="ghost small" id="copyInviteButton">複製 URL+Token</button>
                 <button type="button" class="ghost small" id="copyPlainCodeButton">只複製代碼</button>
               </div>
             </div>
@@ -120,6 +120,7 @@
           </div>
           <nav class="roomControl" aria-label="Room controls">
             <button type="button" class="controlRow active" id="reviewPanelButton"><span>成員與審核</span><b id="pendingCountHint">0</b></button>
+            <button id="sharePanelButton" type="button" class="controlRow"><span>移動端分享</span><b>↗</b></button>
             <button id="drawerShortcutButton" type="button" class="controlRow"><span>檔案庫</span><b>›</b></button>
             <button id="settingsButton" type="button" class="controlRow"><span>房間設定</span><b>›</b></button>
             <button id="networkButton" type="button" class="controlRow"><span>網路資訊</span><b>›</b></button>
@@ -137,6 +138,10 @@
         </aside>
 
         <section class="conversation">
+          <div class="mobileRoomBar" aria-label="Mobile room actions">
+            <div><span>Room</span><strong id="mobileRoomCode">------</strong><small id="mobileInviteUrl">URL+Token 準備中</small></div>
+            <button id="mobileShareButton" type="button">分享</button>
+          </div>
           <header class="topbar">
             <div class="chatTabs" aria-label="聊天室導覽">
               <button type="button" class="tabButton active">聊天室</button>

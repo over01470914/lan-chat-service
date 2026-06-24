@@ -11,6 +11,7 @@ const state = {
   fileSearch: '',
   activeFile: null,
   longPressTimer: null,
+  invite: null,
 };
 
 const categories = [
@@ -50,6 +51,7 @@ $('#createRoomForm').addEventListener('submit', async (event) => {
     body: { name: form.get('roomName'), hostName: form.get('hostName'), autoApprove: form.get('autoApprove') === 'on' },
   });
   state.clientId = result.clientId;
+  state.invite = result.invite || null;
   state.role = 'host';
   localStorage.setItem('lan-chat-client-id', state.clientId);
   localStorage.setItem('lan-chat-role', state.role);
@@ -66,7 +68,7 @@ $('#joinRoomForm').addEventListener('submit', async (event) => {
   const form = new FormData(event.currentTarget);
   const result = await api(`/api/rooms/${form.get('roomCode')}/join`, {
     method: 'POST',
-    body: { name: form.get('clientName'), clientId: state.clientId },
+    body: { name: form.get('clientName'), clientId: state.clientId, inviteToken: inviteTokenFromUrl() },
   });
   state.clientId = result.clientId;
   state.role = 'client';
@@ -122,6 +124,7 @@ $('#leaveButton').addEventListener('click', () => {
   if (state.socket) state.socket.close();
   state.room = null;
   state.pendingAttachments = [];
+  state.invite = null;
   chat.classList.add('hidden');
   landing.classList.remove('hidden');
   hideContextMenu();
@@ -136,8 +139,16 @@ $('#copyInviteButton')?.addEventListener('click', () => copyRoomCode(true));
 $('#settingsButton')?.addEventListener('click', () => openUtilityPanel('settings'));
 $('#networkButton')?.addEventListener('click', () => openUtilityPanel('network'));
 $('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('review'));
+$('#sharePanelButton')?.addEventListener('click', () => openUtilityPanel('share'));
+$('#mobileShareButton')?.addEventListener('click', () => openUtilityPanel('share'));
 $('#closeUtilityButton')?.addEventListener('click', closeUtilityPanel);
-$('#utilityBody')?.addEventListener('click', (event) => {
+$('#utilityBody')?.addEventListener('click', async (event) => {
+  const rotate = event.target.closest('[data-rotate-invite]');
+  if (rotate) {
+    await rotateInviteToken();
+    openUtilityPanel('share');
+    return;
+  }
   const button = event.target.closest('[data-copy-value]');
   if (!button) return;
   copyText(button.dataset.copyValue || '', button.dataset.copyLabel || '已複製');
@@ -219,8 +230,8 @@ function closeSearch() {
 function openUtilityPanel(kind) {
   if (!state.room) return;
   const modal = $('#utilityModal');
-  $('#utilityKicker').textContent = kind === 'network' ? 'Network' : kind === 'settings' ? 'Settings' : 'Review';
-  $('#utilityTitle').textContent = kind === 'network' ? '網路資訊' : kind === 'settings' ? '房間設定' : '成員與審核';
+  $('#utilityKicker').textContent = kind === 'network' ? 'Network' : kind === 'settings' ? 'Settings' : kind === 'share' ? 'Invite' : 'Review';
+  $('#utilityTitle').textContent = kind === 'network' ? '網路資訊' : kind === 'settings' ? '房間設定' : kind === 'share' ? '移動端分享' : '成員與審核';
   $('#utilityBody').innerHTML = renderUtilityBody(kind);
   modal.classList.remove('hidden');
   syncBackdrop();
@@ -261,9 +272,11 @@ function enterRoom(room, status = 'approved') {
   chat.classList.remove('hidden');
   $('#roomTitle').textContent = room.name;
   $('#roomCode').textContent = room.code;
+  $('#mobileRoomCode').textContent = room.code;
   updateAccess(room, status);
   renderRoom(room);
   renderSessionCard();
+  refreshHostInvite();
   connectSocket();
 }
 
@@ -330,7 +343,7 @@ function renderRecentRooms() {
         localStorage.setItem('lan-chat-role', state.role);
         const result = item.role === 'host'
           ? await api(`/api/rooms/${item.code}`)
-          : await api(`/api/rooms/${item.code}/join`, { method: 'POST', body: { name: item.name || 'Client', clientId: item.clientId } });
+          : await api(`/api/rooms/${item.code}/join`, { method: 'POST', body: { name: item.name || 'Client', clientId: item.clientId, inviteToken: inviteTokenFromUrl() } });
         enterRoom(result.room, result.status || item.status || 'approved');
       } catch (error) {
         console.warn('recent room reopen failed', error);
@@ -704,16 +717,36 @@ function escapeHtml(value) {
 
 
 function prefillRoomCodeFromUrl() {
-  const code = new URLSearchParams(location.search).get('room');
+  const params = new URLSearchParams(location.search);
+  const code = params.get('room');
+  const token = params.get('token');
   const input = document.querySelector('[name="roomCode"]');
   if (code && input) input.value = code.replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+  if (token) localStorage.setItem('lan-chat-invite-token', token.slice(0, 64));
+}
+
+function inviteTokenFromUrl() {
+  const params = new URLSearchParams(location.search);
+  return params.get('token') || localStorage.getItem('lan-chat-invite-token') || '';
 }
 
 function inviteLink() {
+  if (state.invite?.inviteUrl) return state.invite.inviteUrl;
   if (!state.room?.code) return location.origin;
   const url = new URL(location.origin);
   url.searchParams.set('room', state.room.code);
+  if (state.invite?.inviteToken) url.searchParams.set('token', state.invite.inviteToken);
   return url.toString();
+}
+
+function cliJoinCommand() {
+  if (state.invite?.cliCommand) return state.invite.cliCommand;
+  if (!state.room?.code) return '';
+  return `lan-chat join --server ${location.origin} --room ${state.room.code}${state.invite?.inviteToken ? ` --token ${state.invite.inviteToken}` : ''} --name Mobile`;
+}
+
+function sshTunnelHint() {
+  return state.invite?.sshTunnelHint || `ssh -L 4301:127.0.0.1:4301 user@host`;
 }
 
 async function copyText(text, label) {
@@ -732,7 +765,7 @@ async function copyText(text, label) {
 
 function copyRoomCode(withLink) {
   if (!state.room?.code) return;
-  const text = withLink ? `${state.room.name} / ${state.room.code} / ${inviteLink()}` : state.room.code;
+  const text = withLink ? inviteLink() : state.room.code;
   copyText(text, withLink ? '已複製邀請連結' : '已複製 Room Code');
 }
 
@@ -780,11 +813,47 @@ function updateSocketStatus(text) {
   if (meta) meta.textContent = text;
 }
 
+async function refreshHostInvite() {
+  if (!state.room || state.role !== 'host') return;
+  if (state.invite?.roomCode === state.room.code) {
+    renderInviteSummary();
+    return;
+  }
+  try {
+    const result = await api(`/api/rooms/${state.room.code}/invite?hostId=${encodeURIComponent(state.clientId)}`);
+    state.invite = result.invite;
+    renderInviteSummary();
+  } catch (error) {
+    console.warn('invite refresh failed', error);
+  }
+}
+
+async function rotateInviteToken() {
+  if (!state.room || state.role !== 'host') return;
+  const result = await api(`/api/rooms/${state.room.code}/invite/rotate`, { method: 'POST', body: { hostId: state.clientId } });
+  state.invite = result.invite;
+  renderInviteSummary();
+  showToast('已更新邀請 token');
+}
+
+function renderInviteSummary() {
+  const target = $('#mobileInviteUrl');
+  if (target) target.textContent = inviteLink();
+}
+
 function renderUtilityBody(kind) {
   const room = state.room;
   const fileCount = getFileItems().length;
   const memberCount = room.approved?.length || 0;
   const pendingCount = room.pending?.length || 0;
+  if (kind === 'share') {
+    return `<div class="utilityGrid">
+      <div class="utilityMetric wide"><small>Mobile invite URL</small><strong>${escapeHtml(inviteLink())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(inviteLink())}" data-copy-label="已複製 mobile invite URL">Copy</button></div>
+      <div class="utilityMetric"><small>Room Token</small><strong>${escapeHtml(state.invite?.inviteToken || '載入中')}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(state.invite?.inviteToken || '')}" data-copy-label="已複製 token">Copy</button></div>
+      <div class="utilityMetric wide"><small>CLI / SSH handoff</small><strong>${escapeHtml(cliJoinCommand())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(cliJoinCommand())}" data-copy-label="已複製 CLI join command">Copy</button></div>
+      <div class="utilityMetric wide"><small>SSH tunnel hint</small><strong>${escapeHtml(sshTunnelHint())}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(sshTunnelHint())}" data-copy-label="已複製 SSH tunnel hint">Copy</button></div>
+    </div><p class="utilityNote">把 Mobile invite URL 傳給手機即可帶 token 加入並自動核准。Token 只允許加入，不含 Host 權限；需要失效舊連結時可重新生成。</p><button type="button" class="ghost" data-rotate-invite>重新生成 token</button>`;
+  }
   if (kind === 'network') {
     return `<div class="utilityGrid">
       <div class="utilityMetric"><small>Origin</small><strong>${escapeHtml(location.origin)}</strong><button type="button" class="metricCopy" data-copy-value="${escapeHtml(location.origin)}" data-copy-label="已複製 Origin">Copy</button></div>

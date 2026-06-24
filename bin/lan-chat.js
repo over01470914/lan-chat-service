@@ -48,14 +48,14 @@ function normalizeServer(value) {
 async function hostRoom() {
   const created = await post('/api/rooms', { name: flags.room || 'LAN Room', hostName: flags.name || 'Host CLI', autoApprove: Boolean(flags['auto-approve']) });
   rememberSession({ server, roomCode: created.room.code, roomName: created.room.name, clientId: created.clientId, role: 'host' });
-  const payload = { server, roomCode: created.room.code, roomToken: created.room.code, hostId: created.clientId, hostToken: created.clientId, autoApprove: created.room.autoApprove, room: created.room };
-  print(payload, [`Room ${created.room.code} created`, `server=${server}`, `roomToken=${created.room.code}`, `hostToken=${created.clientId}`, `autoApprove=${created.room.autoApprove ? 'on' : 'off'}`]);
+  const payload = { server, roomCode: created.room.code, roomToken: created.room.code, inviteToken: created.invite?.inviteToken, inviteUrl: created.invite?.inviteUrl, cliCommand: created.invite?.cliCommand, hostId: created.clientId, hostToken: created.clientId, autoApprove: created.room.autoApprove, room: created.room };
+  print(payload, [`Room ${created.room.code} created`, `server=${server}`, `roomToken=${created.room.code}`, `inviteToken=${created.invite?.inviteToken || ''}`, `inviteUrl=${created.invite?.inviteUrl || ''}`, `hostToken=${created.clientId}`, `autoApprove=${created.room.autoApprove ? 'on' : 'off'}`]);
   if (flags.interactive) await interactive(created.room.code, created.clientId, 'host');
 }
 
 async function joinRoom() {
   const roomCode = requireFlag('room').toUpperCase();
-  const joined = await post(`/api/rooms/${roomCode}/join`, { name: flags.name || 'CLI Client', clientId: flags['client-id'] });
+  const joined = await post(`/api/rooms/${roomCode}/join`, { name: flags.name || 'CLI Client', clientId: flags['client-id'], inviteToken: flags.token || flags['invite-token'] });
   rememberSession({ server, roomCode, roomName: joined.room.name, clientId: joined.clientId, role: 'client', status: joined.status });
   const payload = { server, roomCode, roomToken: roomCode, clientId: joined.clientId, status: joined.status, room: joined.room };
   print(payload, [`Join ${roomCode}: ${joined.status}`, `server=${server}`, `clientId=${joined.clientId}`]);
@@ -175,7 +175,7 @@ function showHelp() {
 
 Usage:
   lan-chat host --server http://host:4301 --room "Ops Room" --name Host [--auto-approve] [--json] [--interactive]
-  lan-chat join --server http://host:4301 --room ABC123 --name Worker [--json] [--interactive]
+  lan-chat join --server http://host:4301 --room ABC123 --name Worker [--token <inviteToken>] [--json] [--interactive]
   lan-chat room --server http://host:4301 --room ABC123 [--json]
   lan-chat approve --room ABC123 --host-id <hostToken> --client-id <clientId>
   lan-chat reject --room ABC123 --host-id <hostToken> --client-id <clientId>
@@ -186,6 +186,7 @@ Usage:
 Notes:
   roomToken is the six-character room code.
   hostToken is the host client id; keep it private because it can approve/reject clients.
+  --token lets mobile or CLI clients join from a Host share URL and be approved without exposing the hostToken.
   --auto-approve lets CLI/Linux clients join and send without a browser approval step.
   LAN_CHAT_SERVER can provide a default server URL.
 `);

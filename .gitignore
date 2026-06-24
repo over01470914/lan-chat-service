@@ -7,5 +7,6 @@ data/
 *.env
 *.local
 *.secret
+dist/
 tencent-ssl/
 docs/ops/TENCENT_CLOUD_CHATROOM_SOP.md

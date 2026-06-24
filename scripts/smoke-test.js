@@ -36,9 +36,25 @@ try {
   const rejectedUpload = await fetch(`${baseUrl}/api/rooms/${create.room.code}/files`, { method: 'POST', body: rejectedForm });
   assert(rejectedUpload.status === 403, 'rejected client cannot upload file');
 
+  assert(create.invite?.inviteToken, 'host create returns invite token');
+  assert(create.invite.inviteUrl.includes(`room=${create.room.code}`), 'invite URL includes room code');
+  assert(create.invite.inviteUrl.includes('token='), 'invite URL includes token');
+  await expectPostStatus(`/api/rooms/${create.room.code}/invite`, {}, 404, 'GET-only invite endpoint rejects POST');
+  const invalidTokenJoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Wrong Token', inviteToken: 'bad-token' });
+  assert(invalidTokenJoin.status === 'pending', 'invalid invite token does not auto approve');
+  const tokenJoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Mobile Client', inviteToken: create.invite.inviteToken });
+  assert(tokenJoin.status === 'approved', 'valid invite token auto approves mobile client');
+  assert(tokenJoin.room.approved.some((client) => client.id === tokenJoin.clientId), 'token joined client is approved');
+  const inviteInfo = await get(`/api/rooms/${create.room.code}/invite?hostId=${create.clientId}`);
+  assert(inviteInfo.invite.cliCommand.includes('--token'), 'invite endpoint includes CLI token command');
+  const rotated = await post(`/api/rooms/${create.room.code}/invite/rotate`, { hostId: create.clientId });
+  assert(rotated.invite.inviteToken !== create.invite.inviteToken, 'host can rotate invite token');
+  const oldTokenJoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Old Token Client', inviteToken: create.invite.inviteToken });
+  assert(oldTokenJoin.status === 'pending', 'rotated old token no longer auto approves');
+
   const join = await post(`/api/rooms/${create.room.code}/join`, { name: 'Client A' });
   assert(join.status === 'pending', 'client starts pending');
-  assert(join.room.pending.length === 1, 'pending client visible');
+  assert(join.room.pending.some((client) => client.id === join.clientId), 'pending client visible');
   const pendingRejoin = await post(`/api/rooms/${create.room.code}/join`, { name: 'Client A', clientId: join.clientId });
   assert(pendingRejoin.status === 'pending', 'recent-room rejoin keeps pending clients pending');
   assert(pendingRejoin.room.pending.filter((client) => client.id === join.clientId).length === 1, 'pending rejoin does not duplicate client');
@@ -70,12 +86,15 @@ try {
   assert(appJs.includes('event.dataTransfer.files'), 'drop attaches files before send');
   assert(appJs.includes('renderFilePreview'), 'file drawer renders previews');
   assert(appJs.includes('touchstart'), 'mobile long press menu is wired');
+  assert(appJs.includes('inviteTokenFromUrl'), 'mobile invite token route is wired');
+  assert(appJs.includes('rotateInviteToken'), 'host can rotate invite token from UI');
   assert(appJs.includes('/settings'), 'room settings toggle is wired');
   assert(appJs.includes('deriveAccessStatus'), 'pending/rejected status derives from room state');
   assert(appJs.includes('Object.prototype.hasOwnProperty.call(options, \'body\')'), 'GET requests do not send JSON bodies');
   assert(indexHtml.includes('type="module"'), 'browser loads module utilities');
   assert(indexHtml.includes('accessNotice'), 'pending access notice is rendered');
   assert(indexHtml.includes('autoApproveToggle'), 'host auto approve toggle is rendered');
+  assert(indexHtml.includes('mobileShareButton'), 'mobile share button is rendered');
 
   const tempDir = await mkdtemp(joinPath(tmpdir(), 'lan-chat-smoke-'));
   const uploadPath = joinPath(tempDir, 'hello.txt');

@@ -20,6 +20,11 @@ try {
   const hosted = runCli(['host', '--server', baseUrl, '--room', 'CLI Room', '--name', 'CLI Host', '--json']);
   assert(hosted.roomCode, 'host command returns roomCode');
   assert(hosted.hostToken === hosted.hostId, 'host command returns host token');
+  assert(hosted.inviteToken, 'host command returns invite token');
+  assert(hosted.inviteUrl.includes('token='), 'host command returns invite URL');
+
+  const tokenJoined = runCli(['join', '--server', baseUrl, '--room', hosted.roomCode, '--name', 'CLI Mobile', '--token', hosted.inviteToken, '--json']);
+  assert(tokenJoined.status === 'approved', 'cli join with invite token is approved');
 
   const joined = runCli(['join', '--server', baseUrl, '--room', hosted.roomCode, '--name', 'CLI Client', '--json']);
   assert(joined.status === 'pending', 'join command starts pending');
@@ -54,7 +59,7 @@ try {
   assert(health.config.maxRoomMessages === 3, 'health exposes max room messages config');
   assert(health.config.maxTotalUploadBytes === 2 * 1024 * 1024, 'health exposes upload quota config');
 
-  console.log(JSON.stringify({ ok: true, roomCode: hosted.roomCode, checks: ['cli host', 'cli join', 'cli approve', 'cli send', 'cli room', 'retention config', 'cli auto approve', 'cli settings'] }, null, 2));
+  console.log(JSON.stringify({ ok: true, roomCode: hosted.roomCode, checks: ['cli host', 'cli token join', 'cli join', 'cli approve', 'cli send', 'cli room', 'retention config', 'cli auto approve', 'cli settings'] }, null, 2));
 } finally {
   server.kill('SIGTERM');
   await new Promise((resolve) => server.once('exit', resolve));

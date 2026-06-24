@@ -13,7 +13,8 @@
     "bootstrap:artifacts": "node scripts/bootstrap-artifact-room.js",
     "cli:smoke": "node scripts/cli-smoke-test.js",
     "rooms:prune": "node scripts/prune-rooms.js",
-    "rooms:prune:test": "node scripts/prune-rooms-test.js"
+    "rooms:prune:test": "node scripts/prune-rooms-test.js",
+    "spk": "node scripts/build-spk.js"
   },
   "dependencies": {
     "@fastify/multipart": "^10.0.0",

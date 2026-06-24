@@ -73,6 +73,39 @@ function roomCode() {
   return code;
 }
 
+function shareToken(length = 12) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  let token = '';
+  for (let index = 0; index < length; index += 1) token += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return token;
+}
+
+function tokenMatches(room, token) {
+  return Boolean(room.inviteToken && token && String(token).trim() === room.inviteToken);
+}
+
+function requestOrigin(request) {
+  const forwardedProto = request.headers['x-forwarded-proto'];
+  const protocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto || request.protocol || 'http';
+  const forwardedHost = request.headers['x-forwarded-host'];
+  const host = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost || request.headers.host || `127.0.0.1:${PORT}`;
+  return `${protocol}://${host}`;
+}
+
+function invitePayload(room, request) {
+  const origin = requestOrigin(request);
+  const url = new URL(origin);
+  url.searchParams.set('room', room.code);
+  url.searchParams.set('token', room.inviteToken);
+  return {
+    roomCode: room.code,
+    inviteToken: room.inviteToken,
+    inviteUrl: url.toString(),
+    cliCommand: `lan-chat join --server ${origin} --room ${room.code} --token ${room.inviteToken} --name Mobile`,
+    sshTunnelHint: `ssh -L ${PORT}:127.0.0.1:${PORT} user@host`,
+  };
+}
+
 function publicRoom(room) {
   return {
     code: room.code,
@@ -90,6 +123,7 @@ function ensureRoomLists(room) {
   room.approved ||= [];
   room.rejected ||= [];
   if (typeof room.autoApprove !== 'boolean') room.autoApprove = false;
+  if (!room.inviteToken) room.inviteToken = shareToken();
 }
 
 function requireRoom(code) {
@@ -241,6 +275,7 @@ app.post('/api/rooms', async (request) => {
     name,
     hostId,
     autoApprove,
+    inviteToken: shareToken(),
     createdAt: new Date().toISOString(),
     pending: [],
     approved: [hostId],
@@ -248,15 +283,31 @@ app.post('/api/rooms', async (request) => {
     messages: [],
   };
   await saveDb();
-  return { room: publicRoom(db.rooms[code]), clientId: hostId };
+  const room = db.rooms[code];
+  return { room: publicRoom(room), clientId: hostId, invite: invitePayload(room, request) };
 });
 
 app.get('/api/rooms/:code', async (request) => ({ room: publicRoom(requireRoom(request.params.code)) }));
+
+app.get('/api/rooms/:code/invite', async (request) => {
+  const room = requireRoom(request.params.code);
+  requireHost(room, request.query?.hostId);
+  return { invite: invitePayload(room, request) };
+});
+
+app.post('/api/rooms/:code/invite/rotate', async (request) => {
+  const room = requireRoom(request.params.code);
+  requireHost(room, request.body?.hostId);
+  room.inviteToken = shareToken();
+  await saveDb();
+  return { invite: invitePayload(room, request) };
+});
 
 app.post('/api/rooms/:code/join', async (request) => {
   const room = requireRoom(request.params.code);
   const name = String(request.body?.name || 'Guest').slice(0, 40);
   const existingClientId = request.body?.clientId;
+  const invited = tokenMatches(room, request.body?.inviteToken || request.body?.token);
   if (existingClientId && db.clients[existingClientId] && room.rejected.includes(existingClientId)) {
     return { status: 'rejected', clientId: existingClientId, room: publicRoom(room) };
   }
@@ -264,7 +315,7 @@ app.post('/api/rooms/:code/join', async (request) => {
     return { status: 'approved', clientId: existingClientId, room: publicRoom(room) };
   }
   if (existingClientId && db.clients[existingClientId] && room.pending.includes(existingClientId)) {
-    if (room.autoApprove) {
+    if (room.autoApprove || invited) {
       room.pending = room.pending.filter((id) => id !== existingClientId);
       if (!room.approved.includes(existingClientId)) room.approved.push(existingClientId);
       await saveDb();
@@ -276,8 +327,8 @@ app.post('/api/rooms/:code/join', async (request) => {
   }
   const clientId = randomUUID();
   db.clients[clientId] = { id: clientId, name, role: 'client', createdAt: new Date().toISOString() };
-  const status = room.autoApprove ? 'approved' : 'pending';
-  if (room.autoApprove) room.approved.push(clientId);
+  const status = room.autoApprove || invited ? 'approved' : 'pending';
+  if (room.autoApprove || invited) room.approved.push(clientId);
   else room.pending.push(clientId);
   await saveDb();
   broadcast(room.code, { type: room.autoApprove ? 'room-updated' : 'pending-updated', room: publicRoom(room) });
