@@ -73,6 +73,17 @@
             <label>你的名稱 <input name="clientName" placeholder="Naya" required /></label>
             <button type="submit" class="secondaryAction">加入</button>
           </form>
+
+          <section id="recentRoomsMobile" class="recentRooms mobileRecent hidden" aria-label="最近房間">
+            <div class="sectionHeader compactHeader">
+              <div>
+                <span class="cardKicker">Recent</span>
+                <h2>曾經加入過的 Room</h2>
+              </div>
+              <button id="clearRecentRoomsMobileButton" type="button" class="ghost small">清空</button>
+            </div>
+            <div id="recentRoomsMobileList" class="recentRoomsList"></div>
+          </section>
         </section>
       </section>
 
@@ -128,7 +139,10 @@
         <section class="conversation">
           <div class="mobileRoomBar" aria-label="Mobile room actions">
             <div><span>Room</span><strong id="mobileRoomCode">------</strong><small id="mobileInviteUrl">URL+Token 準備中</small></div>
-            <button id="mobileShareButton" type="button">分享</button>
+            <div class="mobileRoomActions">
+              <button id="mobileRoomMenuButton" type="button" class="secondaryAction">房間</button>
+              <button id="mobileShareButton" type="button">分享</button>
+            </div>
           </div>
 
           <header class="chatHeader">

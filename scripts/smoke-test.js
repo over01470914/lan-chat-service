@@ -95,6 +95,10 @@ try {
   assert(indexHtml.includes('accessNotice'), 'pending access notice is rendered');
   assert(indexHtml.includes('autoApproveToggle'), 'host auto approve toggle is rendered');
   assert(indexHtml.includes('mobileShareButton'), 'mobile share button is rendered');
+  assert(indexHtml.includes('recentRoomsMobile'), 'mobile recent rooms section is rendered');
+  assert(indexHtml.includes('mobileRoomMenuButton'), 'mobile room drawer button is rendered');
+  assert(appJs.includes('openMobileRoomDrawer'), 'mobile room drawer is wired');
+  assert(appJs.includes('recentRoomsMobileList'), 'mobile recent rooms list is wired');
 
   const tempDir = await mkdtemp(joinPath(tmpdir(), 'lan-chat-smoke-'));
   const uploadPath = joinPath(tempDir, 'hello.txt');

@@ -66,10 +66,13 @@ $('#createRoomForm').addEventListener('submit', async (event) => {
   enterRoom(result.room);
 });
 
-$('#clearRecentRoomsButton').addEventListener('click', () => {
+$('#clearRecentRoomsButton').addEventListener('click', clearRecentRooms);
+$('#clearRecentRoomsMobileButton')?.addEventListener('click', clearRecentRooms);
+
+function clearRecentRooms() {
   localStorage.removeItem(RECENT_ROOMS_KEY);
   renderRecentRooms();
-});
+}
 
 $('#joinRoomForm').addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -137,6 +140,7 @@ $('#leaveButton').addEventListener('click', () => {
   chat.classList.add('hidden');
   landing.classList.remove('hidden');
   hideContextMenu();
+  closeMobileRoomDrawer();
 });
 
 $('#drawerButton').addEventListener('click', openDrawer);
@@ -150,6 +154,10 @@ $('#networkButton')?.addEventListener('click', () => openUtilityPanel('network')
 $('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('review'));
 $('#sharePanelButton')?.addEventListener('click', () => openUtilityPanel('share'));
 $('#mobileShareButton')?.addEventListener('click', openMobileShare);
+$('#mobileRoomMenuButton')?.addEventListener('click', openMobileRoomDrawer);
+const chatTabButtons = document.querySelectorAll('.chatTabs .tabButton');
+chatTabButtons[1]?.addEventListener('click', () => openUtilityPanel('review'));
+chatTabButtons[2]?.addEventListener('click', openMobileRoomDrawer);
 $('#closeUtilityButton')?.addEventListener('click', closeUtilityPanel);
 $('#utilityBody')?.addEventListener('click', async (event) => {
   const rotate = event.target.closest('[data-rotate-invite]');
@@ -166,6 +174,7 @@ drawerBackdrop.addEventListener('click', () => {
   closeDrawer();
   closeSearch();
   closeUtilityPanel();
+  closeMobileRoomDrawer();
 });
 $('#fileSearchInput').addEventListener('input', (event) => {
   state.fileSearch = event.target.value;
@@ -206,6 +215,7 @@ document.addEventListener('keydown', (event) => {
     closeDrawer();
     closeSearch();
     closeUtilityPanel();
+    closeMobileRoomDrawer();
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f' && state.room) {
     event.preventDefault();
@@ -214,6 +224,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 function openDrawer() {
+  closeMobileRoomDrawer();
   fileDrawer.classList.add('open');
   syncBackdrop();
   renderFileDrawer();
@@ -221,6 +232,18 @@ function openDrawer() {
 
 function closeDrawer() {
   fileDrawer.classList.remove('open');
+  syncBackdrop();
+}
+
+function openMobileRoomDrawer() {
+  if (!state.room) return;
+  closeDrawer();
+  $('.chatSidebar')?.classList.add('mobileOpen');
+  syncBackdrop();
+}
+
+function closeMobileRoomDrawer() {
+  $('.chatSidebar')?.classList.remove('mobileOpen');
   syncBackdrop();
 }
 
@@ -255,7 +278,8 @@ function syncBackdrop() {
   const searchOpen = !$('#searchModal').classList.contains('hidden');
   const utilityOpen = !$('#utilityModal')?.classList.contains('hidden');
   const drawerOpen = fileDrawer.classList.contains('open');
-  drawerBackdrop.classList.toggle('hidden', !(searchOpen || utilityOpen || drawerOpen));
+  const mobileRoomOpen = $('.chatSidebar')?.classList.contains('mobileOpen');
+  drawerBackdrop.classList.toggle('hidden', !(searchOpen || utilityOpen || drawerOpen || mobileRoomOpen));
 }
 
 async function api(url, options = {}) {
@@ -323,11 +347,19 @@ function forgetRecentRoom(index) {
 }
 
 function renderRecentRooms() {
-  const section = $('#recentRooms');
-  const list = $('#recentRoomsList');
-  if (!section || !list) return;
   const rooms = loadRecentRooms();
-  section.classList.toggle('hidden', rooms.length === 0);
+  const targets = [
+    { section: $('#recentRooms'), list: $('#recentRoomsList') },
+    { section: $('#recentRoomsMobile'), list: $('#recentRoomsMobileList') },
+  ];
+  targets.forEach(({ section, list }) => {
+    if (!section || !list) return;
+    section.classList.toggle('hidden', rooms.length === 0);
+    renderRecentRoomList(list, rooms);
+  });
+}
+
+function renderRecentRoomList(list, rooms) {
   if (!rooms.length) {
     list.innerHTML = '';
     return;
