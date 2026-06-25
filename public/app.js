@@ -12,6 +12,7 @@ const state = {
   activeFile: null,
   longPressTimer: null,
   invite: null,
+  socketStatus: 'WS ready',
 };
 
 const categories = [
@@ -834,39 +835,11 @@ function showToast(text) {
 }
 
 function renderSessionCard() {
-  if (!state.room) return;
-  const isHost = state.role === 'host';
-  const title = $('#sessionTitle');
-  const text = $('#sessionText');
-  const role = $('#sessionRoleMeta');
-  const icon = $('#sessionIcon');
-  const card = $('#sessionCard');
-  if (!title || !text || !role || !icon || !card) return;
-  card.classList.remove('sessionLive', 'sessionPending', 'sessionRejected');
-  if (state.accessStatus === 'pending') {
-    card.classList.add('sessionPending');
-    icon.textContent = '…';
-    title.textContent = '等 Host 放行';
-    text.textContent = '申請已送出。通過後就能聊天、傳檔、看檔案庫。';
-  } else if (state.accessStatus === 'rejected') {
-    card.classList.add('sessionRejected');
-    icon.textContent = '×';
-    title.textContent = '這個身份進不去';
-    text.textContent = 'Host 拒絕了這個 clientId。回首頁換個名字申請，或請 Host 重新放行。';
-  } else {
-    card.classList.add('sessionLive');
-    icon.textContent = isHost ? '⌁' : '✓';
-    title.textContent = isHost ? '房間已開好' : '你已進房';
-    text.textContent = isHost ? '現在可以放人進來、發房碼、切 Auto approve，或看檔案庫。' : '可以聊天、傳檔，也可以在檔案庫裡找之前傳過的東西。';
-  }
-  role.textContent = isHost ? 'Host' : state.accessStatus === 'approved' ? 'Client' : state.accessStatus;
-  role.title = `加入時間 ${(joinedAt || new Date()).toLocaleTimeString()}`;
   renderInviteSummary();
 }
 
 function updateSocketStatus(text) {
-  const meta = $('#socketStatusMeta');
-  if (meta) meta.textContent = text;
+  state.socketStatus = text;
 }
 
 async function refreshHostInvite() {
@@ -968,7 +941,7 @@ function renderUtilityBody(kind) {
     </div><p class="utilityNote">把手機連結發出去，對方打開就能進房。Token 只能加入，沒有 Host 權限；要讓舊連結失效就重新生成。</p><button type="button" class="ghost" data-rotate-invite>重新生成 token</button>`;
   }
   if (kind === 'network') {
-    const socketState = $('#socketStatusMeta')?.textContent || '未知';
+    const socketState = state.socketStatus || '未知';
     return `<div class="shareList">
       ${renderInfoRow('服務位址', location.origin, '同網路設備能連到這個位址，就能打開房間。', location.origin, '已複製服務位址')}
       ${renderInfoRow('WebSocket', socketState, '用來確認聊天室是否仍在線。')}

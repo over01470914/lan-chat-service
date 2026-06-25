@@ -93,6 +93,8 @@ try {
   assert(appJs.includes('Object.prototype.hasOwnProperty.call(options, \'body\')'), 'GET requests do not send JSON bodies');
   assert(indexHtml.includes('type="module"'), 'browser loads module utilities');
   assert(indexHtml.includes('accessNotice'), 'pending access notice is rendered');
+  assert(!indexHtml.includes('id="sessionCard"'), 'redundant session live card is removed from conversation');
+  assert(!appJs.includes('sessionLive'), 'session live card state is no longer rendered');
   assert(indexHtml.includes('autoApproveToggle'), 'host auto approve toggle is rendered');
   assert(indexHtml.includes('mobileShareButton'), 'mobile share button is rendered');
   assert(indexHtml.includes('recentRoomsMobile'), 'mobile recent rooms section is rendered');

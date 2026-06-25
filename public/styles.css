@@ -159,7 +159,7 @@ a { color: var(--text); }
   box-shadow: none;
 }
 .newQuestButton:hover { color: var(--text); background: #fff; border-color: #cfcfca; }
-.eyebrow, .cardKicker, .meta, .fileMeta, .drawerMeta, .connectionPill, .controlRow, .tabButton, .modePills, .approvalMeta, .roomCodeWrap > span {
+.eyebrow, .cardKicker, .meta, .fileMeta, .drawerMeta, .connectionPill, .controlRow, .tabButton, .modePills, .roomCodeWrap > span {
   font-family: var(--mono);
   text-transform: uppercase;
   letter-spacing: .06em;
@@ -337,7 +337,7 @@ h3 { font-size: .96rem; }
 .person strong, .pendingRow strong { color: var(--text); }
 .pendingActions { display: flex; gap: .42rem; }
 
-.conversation { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr) auto; overflow: hidden; background: #fff; }
+.conversation { min-width: 0; min-height: 0; height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; overflow: hidden; background: #fff; }
 .chatHeader { grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--line); }
 .chatTabs { display: flex; gap: .42rem; flex-wrap: wrap; }
 .tabButton, .iconButton, .togglePill {
@@ -355,25 +355,23 @@ h3 { font-size: .96rem; }
 .togglePill { display: inline-flex; align-items: center; gap: .45rem; }
 .mobileRoomBar { display: none; grid-row: 1; }
 .mobileRoomFab { display: none; }
-.approvalCard, .accessNotice {
+.accessNotice {
   grid-row: 2;
   margin: 1rem 1.15rem 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: .9rem;
   padding: .92rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
-  background: var(--panel-2);
+  background: #fff9ee;
+  border-color: #efdfc0;
 }
-.accessNotice { grid-row: 3; background: #fff9ee; border-color: #efdfc0; }
-.approvalIcon, .noticeIcon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #fff; border: 1px solid var(--line); font: 700 .72rem var(--mono); color: var(--muted); }
-.approvalCard p, .accessNotice p { margin: .18rem 0 0; color: var(--muted); line-height: 1.48; overflow-wrap: anywhere; }
-.approvalCard > div, .accessNotice > div { min-width: 0; }
-.approvalMeta { display: grid; grid-template-columns: auto auto; gap: .25rem .55rem; color: var(--dim); font-size: .66rem; }
-.approvalMeta b { color: var(--text); }
-.messages { grid-row: 4; min-height: 0; flex: 1 1 auto; overflow: auto; padding: 1rem 1.15rem 1.35rem; display: flex; flex-direction: column; gap: .78rem; overscroll-behavior: contain; }
+.noticeIcon { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #fff; border: 1px solid var(--line); font: 700 .72rem var(--mono); color: var(--muted); }
+.accessNotice p { margin: .18rem 0 0; color: var(--muted); line-height: 1.48; overflow-wrap: anywhere; }
+.accessNotice > div { min-width: 0; }
+.messages { grid-row: 3; min-height: 0; flex: 1 1 auto; overflow: auto; padding: 1rem 1.15rem 1.35rem; display: flex; flex-direction: column; gap: .78rem; overscroll-behavior: contain; }
 .emptyState { margin: auto; max-width: 420px; padding: 2rem; text-align: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: var(--radius-lg); background: #fbfbfa; }
 .message { max-width: min(680px, 78%); align-self: flex-start; display: grid; gap: .35rem; padding: .75rem .88rem; border: 1px solid var(--line); border-radius: 16px 16px 16px 5px; background: #fbfbfa; }
 .message.mine { align-self: flex-end; border-radius: 16px 16px 5px 16px; color: var(--text); background: #f4efe5; border-color: #dfd2ba; }
@@ -400,7 +398,7 @@ h3 { font-size: .96rem; }
 .attachmentChip { display: inline-flex; align-items: center; gap: .4rem; padding: .38rem .55rem; border: 1px solid var(--line); border-radius: 999px; background: #f8f8f6; color: var(--muted); font-size: .78rem; }
 .attachmentPreview { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; background: #fff; }
 .composer {
-  grid-row: 5;
+  grid-row: 4;
   flex: 0 0 auto;
   margin: 0 1.15rem 1rem;
   border: 1px solid var(--line);
@@ -562,16 +560,15 @@ h3 { font-size: .96rem; }
     max-width: 100vw;
     min-height: var(--app-viewport-height, 100dvh);
     height: var(--app-viewport-height, 100dvh);
-    grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto;
     overflow: hidden;
   }
   .mobileRoomBar { grid-row: 1; }
   .chatHeader { grid-row: 2; }
-  .approvalCard { grid-row: 3; }
-  .accessNotice { grid-row: 4; }
-  .messages { grid-row: 5; }
-  .composer { grid-row: 6; }
-  .mobileRoomBar, .chatHeader, .approvalCard, .accessNotice, .messages, .composer { min-width: 0; max-width: 100%; }
+  .accessNotice { grid-row: 3; }
+  .messages { grid-row: 4; }
+  .composer { grid-row: 5; }
+  .mobileRoomBar, .chatHeader, .accessNotice, .messages, .composer { min-width: 0; max-width: 100%; }
   .mobileRoomFab {
     position: fixed;
     z-index: 14;
@@ -601,8 +598,7 @@ h3 { font-size: .96rem; }
   .mobileRoomBar span, .mobileRoomBar small { display: block; color: var(--dim); font-size: .74rem; }
   .mobileRoomBar small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mobileRoomBar strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); letter-spacing: .08em; }
-  .approvalCard, .accessNotice { width: auto; margin: .8rem; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; }
-  .approvalMeta { grid-column: 1 / -1; }
+  .accessNotice { width: auto; margin: .8rem; grid-template-columns: auto minmax(0, 1fr); overflow: hidden; }
   .messages { padding: .8rem; }
   .message { max-width: 92%; }
   .composer { width: auto; margin: 0 .8rem .8rem; grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -613,7 +609,7 @@ h3 { font-size: .96rem; }
 @media (max-width: 620px) {
   .questIntro { padding-top: .5rem; }
   .roomCodeActions, .sideStats, .utilityGrid { grid-template-columns: 1fr; }
-  .approvalCard, .accessNotice { grid-template-columns: 1fr; }
+  .accessNotice { grid-template-columns: 1fr; }
   .composer { border-radius: var(--radius); }
 }
 
