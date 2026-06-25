@@ -889,7 +889,7 @@ function renderInviteSummary() {
   const inviteButton = $('#copyInviteButton');
   const isHost = state.role === 'host';
   if (target) {
-    if (isHost && state.invite?.inviteUrl) target.textContent = state.invite.inviteUrl;
+    if (isHost && state.invite?.inviteUrl) target.textContent = '邀請連結已就緒，點分享複製';
     else if (isHost) target.textContent = 'URL+Token 生成中';
     else target.textContent = inviteTokenFromUrl() ? 'Invite token 已套用' : 'Client mode / 已連線';
   }
