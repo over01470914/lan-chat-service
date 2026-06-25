@@ -30,6 +30,8 @@
   --radius-xl: 28px;
   --shadow: 0 24px 70px rgba(24, 24, 22, .08);
   --shadow-soft: 0 12px 34px rgba(24, 24, 22, .06);
+  --app-viewport-height: 100dvh;
+  --app-viewport-offset-top: 0px;
   --mono: "SF Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
   --sans: "Geist", "Inter", "SF Pro Text", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -352,6 +354,7 @@ h3 { font-size: .96rem; }
 .topActions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
 .togglePill { display: inline-flex; align-items: center; gap: .45rem; }
 .mobileRoomBar { display: none; grid-row: 1; }
+.mobileRoomFab { display: none; }
 .approvalCard, .accessNotice {
   grid-row: 2;
   margin: 1rem 1.15rem 0;
@@ -553,12 +556,12 @@ h3 { font-size: .96rem; }
   .commandField { grid-template-columns: 1fr; }
   .commandFooter { grid-template-columns: 1fr; display: grid; }
   .joinStrip { grid-template-columns: 1fr; }
-  .chat { width: 100%; max-width: 100vw; height: 100dvh; min-height: 100dvh; grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+  .chat { width: 100%; max-width: 100vw; height: var(--app-viewport-height, 100dvh); min-height: var(--app-viewport-height, 100dvh); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
   .conversation {
     width: 100%;
     max-width: 100vw;
-    min-height: 100dvh;
-    height: 100dvh;
+    min-height: var(--app-viewport-height, 100dvh);
+    height: var(--app-viewport-height, 100dvh);
     grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
     overflow: hidden;
   }
@@ -569,13 +572,29 @@ h3 { font-size: .96rem; }
   .messages { grid-row: 5; }
   .composer { grid-row: 6; }
   .mobileRoomBar, .chatHeader, .approvalCard, .accessNotice, .messages, .composer { min-width: 0; max-width: 100%; }
+  .mobileRoomFab {
+    position: fixed;
+    z-index: 14;
+    top: calc(var(--app-viewport-offset-top, 0px) + env(safe-area-inset-top, 0px) + .72rem);
+    left: .72rem;
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: .44rem .66rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--text);
+    background: rgba(255, 255, 255, .94);
+    box-shadow: 0 10px 30px rgba(20,20,18,.10);
+  }
+  .mobileRoomFab::before { content: "☰"; margin-right: .34rem; font-size: .86rem; line-height: 1; }
   .chatHeader { width: 100%; padding: .8rem; align-items: flex-start; flex-direction: column; overflow: hidden; }
   .chatTabs, .topActions { width: 100%; min-width: 0; max-width: 100%; }
   .chatTabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: .12rem; scrollbar-width: none; }
   .chatTabs::-webkit-scrollbar, .topActions::-webkit-scrollbar { display: none; }
   .chatTabs .tabButton { flex: 0 0 auto; }
   .topActions { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; padding-bottom: .12rem; }
-  .mobileRoomBar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding: .78rem .85rem; border-bottom: 1px solid var(--line); background: var(--sidebar); overflow: hidden; }
+  .mobileRoomBar { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding: .78rem .85rem .78rem 5.45rem; border-bottom: 1px solid var(--line); background: var(--sidebar); overflow: hidden; }
   .mobileRoomBar > div:first-child { min-width: 0; flex: 1 1 auto; overflow: hidden; }
   .mobileRoomActions { display: flex; align-items: center; gap: .45rem; flex: 0 0 auto; }
   .mobileRoomActions button { min-width: 0; padding-inline: .72rem; }

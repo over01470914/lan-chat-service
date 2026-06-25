@@ -97,7 +97,9 @@ try {
   assert(indexHtml.includes('mobileShareButton'), 'mobile share button is rendered');
   assert(indexHtml.includes('recentRoomsMobile'), 'mobile recent rooms section is rendered');
   assert(indexHtml.includes('mobileRoomMenuButton'), 'mobile room drawer button is rendered');
+  assert(indexHtml.includes('mobileRoomFab'), 'persistent mobile drawer entry is rendered');
   assert(appJs.includes('openMobileRoomDrawer'), 'mobile room drawer is wired');
+  assert(appJs.includes('syncMobileViewportHeight'), 'mobile visual viewport resize handling is wired');
   assert(appJs.includes('recentRoomsMobileList'), 'mobile recent rooms list is wired');
 
   const tempDir = await mkdtemp(joinPath(tmpdir(), 'lan-chat-smoke-'));

@@ -40,6 +40,10 @@ const RECENT_ROOMS_KEY = 'lan-chat-recent-rooms';
 
 renderRecentRooms();
 prefillRoomCodeFromUrl();
+syncMobileViewportHeight();
+window.visualViewport?.addEventListener('resize', syncMobileViewportHeight);
+window.visualViewport?.addEventListener('scroll', syncMobileViewportHeight);
+window.addEventListener('resize', syncMobileViewportHeight);
 document.querySelector('[data-focus-room]')?.addEventListener('click', () => document.querySelector('[name=roomName]')?.focus());
 messageInput?.addEventListener('input', resizeComposer);
 messageInput?.addEventListener('keydown', (event) => {
@@ -155,6 +159,7 @@ $('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('revie
 $('#sharePanelButton')?.addEventListener('click', () => openUtilityPanel('share'));
 $('#mobileShareButton')?.addEventListener('click', openMobileShare);
 $('#mobileRoomMenuButton')?.addEventListener('click', openMobileRoomDrawer);
+$('#mobileRoomFab')?.addEventListener('click', openMobileRoomDrawer);
 const chatTabButtons = document.querySelectorAll('.chatTabs .tabButton');
 chatTabButtons[1]?.addEventListener('click', () => openUtilityPanel('review'));
 chatTabButtons[2]?.addEventListener('click', openMobileRoomDrawer);
@@ -272,6 +277,15 @@ function openUtilityPanel(kind) {
 function closeUtilityPanel() {
   $('#utilityModal')?.classList.add('hidden');
   syncBackdrop();
+}
+
+function syncMobileViewportHeight() {
+  const viewport = window.visualViewport;
+  const height = viewport?.height || window.innerHeight || document.documentElement.clientHeight;
+  const offsetTop = viewport?.offsetTop || 0;
+  const safeHeight = Math.max(320, Math.round(height));
+  document.documentElement.style.setProperty('--app-viewport-height', `${safeHeight}px`);
+  document.documentElement.style.setProperty('--app-viewport-offset-top', `${Math.round(offsetTop)}px`);
 }
 
 function syncBackdrop() {
