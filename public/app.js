@@ -137,7 +137,10 @@ for (const dropTarget of [messages, messageForm]) {
   });
 }
 
-$('#leaveButton').addEventListener('click', () => {
+$('#leaveButton').addEventListener('click', leaveRoom);
+$('#mobileLeaveButton')?.addEventListener('click', leaveRoom);
+
+function leaveRoom() {
   if (state.socket) state.socket.close();
   state.room = null;
   state.pendingAttachments = [];
@@ -146,7 +149,7 @@ $('#leaveButton').addEventListener('click', () => {
   landing.classList.remove('hidden');
   hideContextMenu();
   closeMobileRoomDrawer();
-});
+}
 
 $('#drawerButton').addEventListener('click', openDrawer);
 $('#drawerShortcutButton')?.addEventListener('click', openDrawer);
@@ -158,8 +161,12 @@ $('#settingsButton')?.addEventListener('click', () => openUtilityPanel('settings
 $('#networkButton')?.addEventListener('click', () => openUtilityPanel('network'));
 $('#reviewPanelButton')?.addEventListener('click', () => openUtilityPanel('review'));
 $('#sharePanelButton')?.addEventListener('click', () => openUtilityPanel('share'));
-$('#mobileShareButton')?.addEventListener('click', openMobileShare);
-$('#mobileRoomMenuButton')?.addEventListener('click', openMobileRoomDrawer);
+$('#mobileCopyRoomCodeButton')?.addEventListener('click', () => copyRoomCode(false));
+$('#mobileCopyPlainCodeButton')?.addEventListener('click', () => copyRoomCode(false));
+$('#mobileCopyInviteButton')?.addEventListener('click', openMobileShare);
+$('#mobileFilesButton')?.addEventListener('click', openDrawer);
+$('#mobileSettingsButton')?.addEventListener('click', () => openUtilityPanel('settings'));
+$('#mobileNetworkButton')?.addEventListener('click', () => openUtilityPanel('network'));
 $('#mobileRoomFab')?.addEventListener('click', openMobileRoomDrawer);
 const chatTabButtons = document.querySelectorAll('.chatTabs .tabButton');
 chatTabButtons[1]?.addEventListener('click', () => openUtilityPanel('review'));
@@ -321,6 +328,7 @@ function enterRoom(room, status = 'approved') {
   $('#roomTitle').textContent = room.name;
   $('#roomCode').textContent = room.code;
   $('#mobileRoomCode').textContent = room.code;
+  updateSocketStatus(state.socketStatus || 'WS READY');
   updateAccess(room, status);
   renderRoom(room);
   renderSessionCard();
@@ -485,6 +493,10 @@ function updateAccess(room, statusHint) {
   }
 
   $('#roleText').textContent = isHost ? `Host mode / Auto approve ${room.autoApprove ? 'ON' : 'OFF'}` : state.accessStatus === 'approved' ? 'Client mode' : state.accessStatus === 'rejected' ? '已被 Host 拒絕' : '等待 Host 審核';
+  $('#mobileRoleChip').textContent = isHost ? 'HOST' : state.accessStatus === 'approved' ? 'CLIENT' : state.accessStatus === 'pending' ? 'PENDING' : 'REJECTED';
+  $('#mobileAutoApproveChip').textContent = `Auto approve ${room.autoApprove ? 'ON' : 'OFF'}`;
+  const mobileConnectionChip = $('#mobileConnectionChip');
+  if (mobileConnectionChip) mobileConnectionChip.lastChild.textContent = state.accessStatus === 'rejected' ? '已拒絕' : state.accessStatus === 'pending' ? '待審核' : '已連線';
   $('#statusText').textContent = state.accessStatus === 'rejected' ? '已拒絕' : state.accessStatus === 'pending' ? '待審核中，暫不可發言' : '已連線';
   renderSessionCard();
 }
@@ -530,6 +542,7 @@ function renderMembers(room) {
   const approved = room.approved || [];
   const host = approved.find((member) => member.role === 'host') || approved[0];
   $('#memberCountHint').textContent = `${approved.length} / 24`;
+  $('#mobileMemberChip').textContent = `${approved.length}/24 成員`;
   $('#hostHint').textContent = host ? `${host.name} ${host.role === 'host' ? '(Host)' : ''}` : '未指定';
   $('#memberList').innerHTML = approved.map((member) => `<div class="person" data-initial="${escapeHtml((member.name || '?').slice(0, 1))}"><span>${escapeHtml(member.name)}</span><small>${escapeHtml(member.role)}</small></div>`).join('');
 }
@@ -569,6 +582,10 @@ function renderPending(room) {
 
 function renderMessages() {
   if (!state.room) return;
+  if (!state.room.messages.length) {
+    messages.innerHTML = '<div class="chatEmptyState"><strong>房間已就緒</strong><span>貼上連結、輸入訊息，或用下方 + 上傳檔案。</span></div>';
+    return;
+  }
   messages.innerHTML = state.room.messages.map((message) => {
     const mine = message.clientId === state.clientId ? ' mine' : '';
     const body = message.type === 'file' ? renderFile(message) : `<div>${linkify(escapeHtml(message.text))}</div>`;
@@ -840,6 +857,8 @@ function renderSessionCard() {
 
 function updateSocketStatus(text) {
   state.socketStatus = text;
+  const mobileSocket = $('#mobileSocketStatus');
+  if (mobileSocket) mobileSocket.textContent = text;
 }
 
 async function refreshHostInvite() {
@@ -871,18 +890,12 @@ async function rotateInviteToken() {
 }
 
 function renderInviteSummary() {
-  const target = $('#mobileInviteUrl');
-  const mobileButton = $('#mobileShareButton');
+  const mobileInviteButton = $('#mobileCopyInviteButton');
   const inviteButton = $('#copyInviteButton');
   const isHost = state.role === 'host';
-  if (target) {
-    if (isHost && state.invite?.inviteUrl) target.textContent = '邀請連結已就緒，點分享複製';
-    else if (isHost) target.textContent = 'URL+Token 生成中';
-    else target.textContent = inviteTokenFromUrl() ? 'Invite token 已套用' : 'Client mode / 已連線';
-  }
-  if (mobileButton) {
-    mobileButton.textContent = isHost ? '分享' : '房碼';
-    mobileButton.disabled = false;
+  if (mobileInviteButton) {
+    mobileInviteButton.disabled = isHost && !state.invite?.inviteUrl;
+    mobileInviteButton.querySelector('small').textContent = isHost ? '複製 URL+Token' : '複製房碼';
   }
   if (inviteButton) {
     inviteButton.disabled = !isHost || !state.invite?.inviteUrl;

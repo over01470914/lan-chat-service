@@ -139,13 +139,29 @@
         </aside>
 
         <section class="conversation">
-          <div class="mobileRoomBar" aria-label="Mobile room actions">
-            <div><span>Room</span><strong id="mobileRoomCode">------</strong><small id="mobileInviteUrl">URL+Token 準備中</small></div>
-            <div class="mobileRoomActions">
-              <button id="mobileRoomMenuButton" type="button" class="secondaryAction">房間</button>
-              <button id="mobileShareButton" type="button">分享</button>
-            </div>
+          <div class="mobileAppBar" aria-label="Mobile chat header">
+            <button id="mobileLeaveButton" type="button" class="mobileBackButton" aria-label="返回首頁">‹</button>
+            <div class="mobileBrandBlock"><span class="brandGlyph">›_</span><strong>LAN Chatroom</strong></div>
+            <div class="mobileStatusCluster"><span id="mobileRoleChip">HOST</span><small><i></i><b id="mobileSocketStatus">WS READY</b></small></div>
           </div>
+
+          <section class="mobileRoomHero" aria-label="Mobile room summary">
+            <div class="mobileHeroTop"><span>房間代碼</span><button type="button" id="mobileCopyRoomCodeButton" class="copyMini">COPY</button></div>
+            <strong id="mobileRoomCode">------</strong>
+            <div class="mobileHeroChips">
+              <span id="mobileAutoApproveChip">Auto approve OFF</span>
+              <span id="mobileMemberChip">0/24 成員</span>
+              <span id="mobileConnectionChip"><i></i>已連線</span>
+            </div>
+          </section>
+
+          <nav class="mobileQuickActions" aria-label="Mobile room quick actions">
+            <button id="mobileCopyInviteButton" type="button"><span>↗</span><small>複製 URL+Token</small></button>
+            <button id="mobileCopyPlainCodeButton" type="button"><span>#</span><small>只複製代碼</small></button>
+            <button id="mobileFilesButton" type="button"><span>MD</span><small>檔案庫</small></button>
+            <button id="mobileSettingsButton" type="button"><span>⚙</span><small>房間設定</small></button>
+            <button id="mobileNetworkButton" type="button"><span>⌁</span><small>網路資訊</small></button>
+          </nav>
 
           <header class="chatHeader">
             <div class="chatTabs" aria-label="聊天室導覽">

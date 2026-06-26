@@ -96,13 +96,16 @@ try {
   assert(!indexHtml.includes('id="sessionCard"'), 'redundant session live card is removed from conversation');
   assert(!appJs.includes('sessionLive'), 'session live card state is no longer rendered');
   assert(indexHtml.includes('autoApproveToggle'), 'host auto approve toggle is rendered');
-  assert(indexHtml.includes('mobileShareButton'), 'mobile share button is rendered');
+  assert(indexHtml.includes('mobileLeaveButton'), 'mobile back button is rendered');
+  assert(indexHtml.includes('mobileCopyInviteButton'), 'mobile invite copy button is rendered');
   assert(indexHtml.includes('recentRoomsMobile'), 'mobile recent rooms section is rendered');
-  assert(indexHtml.includes('mobileRoomMenuButton'), 'mobile room drawer button is rendered');
-  assert(indexHtml.includes('mobileRoomFab'), 'persistent mobile drawer entry is rendered');
+  assert(indexHtml.includes('mobileRoomHero'), 'mobile room hero is rendered');
+  assert(indexHtml.includes('mobileQuickActions'), 'mobile quick action strip is rendered');
   assert(appJs.includes('openMobileRoomDrawer'), 'mobile room drawer is wired');
   assert(appJs.includes('syncMobileViewportHeight'), 'mobile visual viewport resize handling is wired');
+  assert(appJs.includes('mobileLeaveButton'), 'mobile back button is wired');
   assert(appJs.includes('recentRoomsMobileList'), 'mobile recent rooms list is wired');
+  assert(appJs.includes('chatEmptyState'), 'mobile chat empty state is rendered');
 
   const tempDir = await mkdtemp(joinPath(tmpdir(), 'lan-chat-smoke-'));
   const uploadPath = joinPath(tempDir, 'hello.txt');
